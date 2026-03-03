@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import { database } from '@/lib/database'
 import { randomUUID } from 'crypto'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
+import { cuidToUuid } from '@/lib/uuid-utils'
 
 export async function POST(
   request: NextRequest,
@@ -10,25 +12,16 @@ export async function POST(
   try {
     const { twin_id } = await params
 
-    // Authenticate user
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ 
-        error: 'Authentication required' 
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        error: 'Authentication required',
       }, { status: 401 })
     }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ 
-        error: 'Invalid authentication' 
-      }, { status: 401 })
-    }
+    const userId = cuidToUuid(session.user.id)
 
     // Verify twin ownership
-    const twin = await database.findTwin(twin_id, user.id)
+    const twin = await database.findTwin(twin_id, userId)
     if (!twin) {
       return NextResponse.json({
         error: 'Twin not found or access denied'
@@ -48,7 +41,7 @@ export async function POST(
     // Generate IDs if not provided
     const sessionData = {
       twin_id,
-      user_id: user.id,
+      user_id: userId,
       type: type as 'trainer' | 'chat',
       notebook_id: notebook_id || `notebook_${randomUUID().slice(0, 8)}`,
       chapter_id: chapter_id || `chapter_${randomUUID().slice(0, 8)}`,
@@ -60,24 +53,24 @@ export async function POST(
     }
 
     // Create session record
-    const session = await database.createSession(sessionData)
+    const createdSession = await database.createSession(sessionData)
 
     console.log(`Session created for twin ${twin_id}:`, {
-      session_id: session.id,
-      type: session.type,
-      notebook_id: session.notebook_id,
-      chapter_id: session.chapter_id,
-      thread_id: session.thread_id
+      session_id: createdSession.id,
+      type: createdSession.type,
+      notebook_id: createdSession.notebook_id,
+      chapter_id: createdSession.chapter_id,
+      thread_id: createdSession.thread_id
     })
 
     return NextResponse.json({
-      session_id: session.id,
-      twin_id: session.twin_id,
-      type: session.type,
-      notebook_id: session.notebook_id,
-      chapter_id: session.chapter_id,
-      thread_id: session.thread_id,
-      created_at: session.created_at
+      session_id: createdSession.id,
+      twin_id: createdSession.twin_id,
+      type: createdSession.type,
+      notebook_id: createdSession.notebook_id,
+      chapter_id: createdSession.chapter_id,
+      thread_id: createdSession.thread_id,
+      created_at: createdSession.created_at
     })
 
   } catch (error) {
@@ -96,25 +89,16 @@ export async function GET(
   try {
     const { twin_id } = await params
 
-    // Authenticate user
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ 
-        error: 'Authentication required' 
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        error: 'Authentication required',
       }, { status: 401 })
     }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ 
-        error: 'Invalid authentication' 
-      }, { status: 401 })
-    }
+    const userId = cuidToUuid(session.user.id)
 
     // Verify twin ownership
-    const twin = await database.findTwin(twin_id, user.id)
+    const twin = await database.findTwin(twin_id, userId)
     if (!twin) {
       return NextResponse.json({
         error: 'Twin not found or access denied'
@@ -122,19 +106,11 @@ export async function GET(
     }
 
     // Get sessions for this twin
-    const { data: sessions, error } = await supabase
-      .from('twin_sessions')
-      .select()
-      .eq('twin_id', twin_id)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
-    }
+    const sessions = await database.getTwinSessions(twin_id)
 
     return NextResponse.json({
       twin_id,
-      sessions: sessions || []
+      sessions
     })
 
   } catch (error) {

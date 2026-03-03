@@ -14,7 +14,7 @@ export async function GET(
     
     if (!twin) {
       const all = await database.getAllTwins()
-      const match = all.find(t => (t.public_url || '').toLowerCase() === slug.toLowerCase())
+      const match = all.find((twinRecord) => (twinRecord.public_url || '').toLowerCase() === slug.toLowerCase())
       if (match) twin = match
     }
     

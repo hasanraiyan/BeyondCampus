@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseService } from '@/lib/server/supabase-admin'
+import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
+
+const prisma = new PrismaClient()
 
 interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy'
   timestamp: string
   correlation_id: string
   services: {
-    supabase: {
+    postgres: {
       status: 'up' | 'down'
       latency_ms?: number
       error?: string
@@ -25,17 +27,10 @@ interface HealthStatus {
   }
 }
 
-async function checkSupabase(): Promise<{ status: 'up' | 'down', latency_ms?: number, error?: string }> {
+async function checkPostgres(): Promise<{ status: 'up' | 'down', latency_ms?: number, error?: string }> {
   const startTime = Date.now()
   try {
-    if (!supabaseService) {
-      throw new Error('Supabase service not configured')
-    }
-    const { error } = await supabaseService.from('twins').select('count').limit(1)
-    
-    if (error) {
-      throw error
-    }
+    await prisma.twin.count()
 
     return {
       status: 'up',
@@ -91,19 +86,19 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthStat
 
   try {
     // Check all services in parallel
-    const [supabaseHealth, trainerHealth, chatHealth] = await Promise.all([
-      checkSupabase(),
+    const [postgresHealth, trainerHealth, chatHealth] = await Promise.all([
+      checkPostgres(),
       checkAssistantService(process.env.TRAINER_SERVICE_URL || 'http://localhost:8123', 'trainer'),
       checkAssistantService(process.env.CHAT_SERVICE_URL || 'http://localhost:8124', 'chat')
     ])
 
     // Determine overall status
-    const downServices = [supabaseHealth, trainerHealth, chatHealth].filter(s => s.status === 'down')
+    const downServices = [postgresHealth, trainerHealth, chatHealth].filter(s => s.status === 'down')
     let overallStatus: 'healthy' | 'degraded' | 'unhealthy'
 
     if (downServices.length === 0) {
       overallStatus = 'healthy'
-    } else if (supabaseHealth.status === 'down') {
+    } else if (postgresHealth.status === 'down') {
       overallStatus = 'unhealthy' // DB down is critical
     } else {
       overallStatus = 'degraded' // Some AI services down but DB works
@@ -114,7 +109,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthStat
       timestamp: new Date().toISOString(),
       correlation_id: correlationId,
       services: {
-        supabase: supabaseHealth,
+        postgres: postgresHealth,
         trainer_service: trainerHealth,
         chat_service: chatHealth
       }
@@ -138,7 +133,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthStat
       timestamp: new Date().toISOString(),
       correlation_id: correlationId,
       services: {
-        supabase: { status: 'down', error: 'Health check failed' },
+        postgres: { status: 'down', error: 'Health check failed' },
         trainer_service: { status: 'down', error: 'Health check failed' },
         chat_service: { status: 'down', error: 'Health check failed' }
       }

@@ -16,6 +16,37 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Local PostgreSQL Setup (Free)
+
+This project is configured to run with local PostgreSQL via Docker.
+By default, it maps to local port `5433` to avoid conflicts with any existing Postgres on `5432`.
+
+1. Copy environment variables:
+
+```bash
+cp .env.example .env
+```
+
+2. Start PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+3. Apply Prisma schema:
+
+```bash
+npx prisma migrate dev --schema database/prisma/schema.prisma --name init_local_postgres
+```
+
+4. Start the app:
+
+```bash
+npm run dev
+```
+
+If you change Prisma models later, run `npx prisma migrate dev --schema database/prisma/schema.prisma`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

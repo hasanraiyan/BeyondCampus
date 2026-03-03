@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { database } from '@/lib/database'
-import { supabase } from '@/lib/supabase'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth header and verify user
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Authentication required' 
-      }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid authentication' 
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required',
       }, { status: 401 })
     }
 
     // Fetch user profile
-    const profile = await database.getUser(user.id)
+    const profile = await database.getUser(session.user.id)
     
     if (!profile) {
       return NextResponse.json({ 
@@ -45,29 +35,18 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Get auth header and verify user
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Authentication required' 
-      }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid authentication' 
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required',
       }, { status: 401 })
     }
 
     const updates = await request.json()
 
     // Update user profile
-    const updatedProfile = await database.updateUser(user.id, updates)
+    const updatedProfile = await database.updateUser(session.user.id, updates)
 
     return NextResponse.json({ 
       success: true,

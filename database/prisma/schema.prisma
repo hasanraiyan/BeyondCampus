@@ -45,3 +45,54 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+enum TwinStatus {
+  TRAINING
+  PUBLISHED
+}
+
+enum TwinSessionType {
+  trainer
+  chat
+}
+
+enum TwinSessionStatus {
+  ACTIVE
+  COMPLETED
+  ERROR
+}
+
+model Twin {
+  id           String     @id @default(uuid())
+  user_id      String
+  user_name    String
+  twin_name    String
+  tagline      String?
+  personality  String?
+  tone         String?
+  links        Json       @default("[]")
+  status       TwinStatus @default(TRAINING)
+  public_url   String?    @unique
+  created_at   DateTime   @default(now())
+  published_at DateTime?
+
+  sessions TwinSession[]
+}
+
+model TwinSession {
+  id         String            @id @default(uuid())
+  twin_id    String
+  user_id    String?
+  type       TwinSessionType
+  notebook_id String?
+  chapter_id String?
+  thread_id  String?
+  status     TwinSessionStatus @default(ACTIVE)
+  metadata   Json?
+  created_at DateTime          @default(now())
+  ended_at   DateTime?
+
+  twin Twin @relation(fields: [twin_id], references: [id], onDelete: Cascade)
+
+  @@index([twin_id, created_at])
+}
