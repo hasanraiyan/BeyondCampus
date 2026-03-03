@@ -1,64 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/database'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
+import { ExamType } from '@prisma/client'
 
-const prisma = new PrismaClient()
+interface TestScoreInput {
+  examType: ExamType
+  overallScore: number
+  subScores?: Record<string, number>
+  dateTaken?: string
+}
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session) {
-      return NextResponse.json({ 
-        message: 'Unauthorized' 
+      return NextResponse.json({
+        message: 'Unauthorized',
       }, { status: 401 })
     }
 
     const {
-      userName,
+      degreeLevel,
+      fieldOfStudy,
       currentEducation,
-      targetCountries,
-      studyTimeline,
-      preferredCourse,
-      budget
+      targetCountry,
+      intakeSeason,
+      intakeYear,
+      budgetRange,
+      hasGivenTests,
+      testScores,
     } = await request.json()
 
-    // Ensure targetCountries is always an array
-    const countriesArray = Array.isArray(targetCountries) 
-      ? targetCountries 
-      : targetCountries 
-        ? [targetCountries] 
-        : []
+    const userId = session.user.id
 
-    // Update user with onboarding data
-    const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data: {
-        nickname: userName,
-        currentEducation,
-        targetCountries: countriesArray,
-        studyTimeline,
-        preferredCourse,
-        budget: budget || null,
-        onboardingCompleted: true
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          degreeLevel: degreeLevel || null,
+          fieldOfStudy: fieldOfStudy || null,
+          currentEducation: currentEducation || null,
+          targetCountry: targetCountry || 'US',
+          intakeSeason: intakeSeason || null,
+          intakeYear: intakeYear ? parseInt(intakeYear) : null,
+          budgetRange: budgetRange || null,
+          hasGivenTests: hasGivenTests ?? null,
+          onboardingCompleted: true,
+        },
+      })
+
+      if (hasGivenTests && Array.isArray(testScores) && testScores.length > 0) {
+        await tx.testScore.createMany({
+          data: testScores.map((ts: TestScoreInput) => ({
+            userId,
+            examType: ts.examType,
+            overallScore: ts.overallScore,
+            subScores: ts.subScores ?? undefined,
+            dateTaken: ts.dateTaken ? new Date(ts.dateTaken) : null,
+          })),
+        })
       }
+
+      return user
     })
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Onboarding data saved successfully',
       user: {
         id: updatedUser.id,
         email: updatedUser.email,
-        nickname: updatedUser.nickname,
-        onboardingCompleted: updatedUser.onboardingCompleted
-      }
+        onboardingCompleted: updatedUser.onboardingCompleted,
+      },
     })
   } catch (error) {
     console.error('Onboarding error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Failed to save onboarding data',
-      error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined,
     }, { status: 500 })
   }
 }

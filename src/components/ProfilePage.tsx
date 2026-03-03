@@ -8,61 +8,187 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { 
-  ArrowLeft, 
-  Edit2, 
-  Save, 
-  X, 
-  GraduationCap, 
-  Globe, 
-  Calendar,
+import {
+  ArrowLeft,
+  Edit2,
+  Save,
+  GraduationCap,
+  Globe,
   BookOpen,
   DollarSign,
   User,
-  Mail,
   Shield,
-  Bell,
-  Moon,
-  Sun,
-  Check,
-  Settings
+  ClipboardList,
+  Plus,
+  Trash2,
+  Calendar,
+  FileText,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+
+// ── Types ────────────────────────────────────────────────
+
+interface TestScore {
+  id: string
+  examType: string
+  overallScore: number
+  subScores: Record<string, number> | null
+  dateTaken: string | null
+}
+
+interface ProfileField {
+  id: string
+  title: string
+  value: string
+  category: string
+  extractedBy: string
+  sourceDocumentId: string | null
+}
 
 interface UserProfile {
   id: string
-  name: string
   email: string
-  nickname?: string
-  currentEducation?: string
-  targetCountries?: string[]
-  studyTimeline?: string
-  preferredCourse?: string
-  budget?: string
+  firstName: string
+  lastName: string
   onboardingCompleted: boolean
+  degreeLevel: string | null
+  fieldOfStudy: string | null
+  currentEducation: string | null
+  targetCountry: string | null
+  intakeSeason: string | null
+  intakeYear: number | null
+  budgetRange: string | null
+  hasGivenTests: boolean | null
+  testScores: TestScore[]
+  profileFields: ProfileField[]
 }
 
-const educationOptions = ['High School (12th)', "Bachelor's Degree", "Master's Degree", 'Working Professional']
-const countryOptions = ['USA', 'UK', 'Canada', 'Australia', 'Germany', 'Netherlands', 'Other']
-const timelineOptions = ['This Year', 'Next Year', '2+ Years', 'Just Exploring']
-const courseOptions = ['Engineering', 'Business & Management', 'Computer Science', 'Medicine', 'Arts & Design', 'Sciences', 'Other']
-const budgetOptions = ['< $20,000', '$20,000 - $40,000', '$40,000 - $60,000', '> $60,000', 'Need guidance']
+interface EditableTestScore {
+  examType: string
+  overallScore: string
+}
+
+// ── Option Maps ──────────────────────────────────────────
+
+const DEGREE_LABELS: Record<string, string> = {
+  UG: 'Undergraduate',
+  PG: 'Postgraduate',
+  MBA: 'MBA',
+  PHD: 'PhD',
+}
+
+const SEASON_LABELS: Record<string, string> = {
+  FALL: 'Fall',
+  SPRING: 'Spring',
+  SUMMER: 'Summer',
+}
+
+const BUDGET_LABELS: Record<string, string> = {
+  UNDER_20K: 'Under $20K/year',
+  USD_20K_40K: '$20K – $40K/year',
+  USD_40K_60K: '$40K – $60K/year',
+  USD_60K_PLUS: '$60K+/year',
+}
+
+const DEGREE_OPTIONS = ['UG', 'PG', 'MBA', 'PHD']
+const SEASON_OPTIONS = ['FALL', 'SPRING', 'SUMMER']
+const BUDGET_OPTIONS = ['UNDER_20K', 'USD_20K_40K', 'USD_40K_60K', 'USD_60K_PLUS']
+const COUNTRY_OPTIONS = ['US', 'UK', 'Canada', 'Australia', 'Germany']
+const EXAM_OPTIONS = ['GRE', 'GMAT', 'IELTS', 'TOEFL', 'SAT', 'ACT']
+const FIELD_OPTIONS = ['Computer Science', 'Engineering', 'Business & Finance', 'Data Science & AI', 'Medicine & Health', 'Arts & Design', 'Law', 'Other']
+
+const currentYear = new Date().getFullYear()
+const YEAR_OPTIONS = Array.from({ length: 4 }, (_, i) => currentYear + i)
+
+const CATEGORY_LABELS: Record<string, string> = {
+  ACADEMIC: 'Academic',
+  TEST_SCORE: 'Test Score',
+  PERSONAL: 'Personal',
+  IMMIGRATION: 'Immigration',
+  FINANCIAL: 'Financial',
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+function computeCompleteness(p: UserProfile): number {
+  const checks = [
+    !!p.firstName,
+    !!p.email,
+    !!p.degreeLevel,
+    !!p.fieldOfStudy,
+    !!p.currentEducation,
+    !!p.targetCountry,
+    !!p.intakeSeason,
+    !!p.intakeYear,
+    !!p.budgetRange,
+    p.hasGivenTests !== null,
+    p.hasGivenTests ? p.testScores.length > 0 : true,
+  ]
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+}
+
+// ── Select Component ─────────────────────────────────────
+
+function SelectField({
+  label,
+  value,
+  options,
+  labelMap,
+  isEditing,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string | null
+  options: string[]
+  labelMap?: Record<string, string>
+  isEditing: boolean
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  const display = value ? (labelMap?.[value] ?? value) : 'Not set'
+  if (!isEditing) {
+    return (
+      <div>
+        <Label className="text-gray-400 text-sm">{label}</Label>
+        <p className="mt-1 text-white">{display}</p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <Label className="text-gray-400 text-sm">{label}</Label>
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
+      >
+        <option value="">{placeholder || `Select ${label.toLowerCase()}`}</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {labelMap?.[opt] ?? opt}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// ── Main Component ───────────────────────────────────────
 
 export default function ProfilePage() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [editedProfile, setEditedProfile] = useState<UserProfile | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
-  const [notifications, setNotifications] = useState(true)
+
+  // Editable copies
+  const [editFields, setEditFields] = useState<Partial<UserProfile>>({})
+  const [editScores, setEditScores] = useState<EditableTestScore[]>([])
 
   useEffect(() => {
     if (status === 'loading') return
-    if (!session) {
-      router.push('/auth/signin')
-    }
+    if (!session) router.push('/auth/signin')
   }, [session, status, router])
 
   useEffect(() => {
@@ -71,33 +197,67 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch('/api/user/profile')
-      if (response.ok) {
-        const data = await response.json()
+      const res = await fetch('/api/user/profile')
+      if (res.ok) {
+        const data = await res.json()
         setProfile(data)
-        setEditedProfile(data)
+        resetEdits(data)
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
     }
   }
 
+  const resetEdits = (p: UserProfile) => {
+    setEditFields({
+      firstName: p.firstName,
+      lastName: p.lastName,
+      degreeLevel: p.degreeLevel,
+      fieldOfStudy: p.fieldOfStudy,
+      currentEducation: p.currentEducation,
+      targetCountry: p.targetCountry,
+      intakeSeason: p.intakeSeason,
+      intakeYear: p.intakeYear,
+      budgetRange: p.budgetRange,
+      hasGivenTests: p.hasGivenTests,
+    })
+    setEditScores(
+      p.testScores.map((ts) => ({
+        examType: ts.examType,
+        overallScore: String(ts.overallScore),
+      }))
+    )
+  }
+
+  const startEditing = () => {
+    if (profile) resetEdits(profile)
+    setIsEditing(true)
+  }
+
+  const cancelEditing = () => {
+    if (profile) resetEdits(profile)
+    setIsEditing(false)
+  }
+
   const handleSave = async () => {
-    if (!editedProfile) return
-    
+    if (!profile) return
     setIsSaving(true)
     try {
-      const response = await fetch('/api/user/profile', {
+      const payload: Record<string, any> = { ...editFields }
+      payload.testScores = editScores
+        .filter((ts) => ts.examType && ts.overallScore)
+        .map((ts) => ({ examType: ts.examType, overallScore: parseFloat(ts.overallScore) }))
+
+      const res = await fetch('/api/user/profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editedProfile),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
 
-      if (response.ok) {
-        const updatedProfile = await response.json()
-        setProfile(updatedProfile)
+      if (res.ok) {
+        const { user } = await res.json()
+        setProfile(user)
+        resetEdits(user)
         setIsEditing(false)
       }
     } catch (error) {
@@ -107,9 +267,18 @@ export default function ProfilePage() {
     }
   }
 
-  const handleCancel = () => {
-    setEditedProfile(profile)
-    setIsEditing(false)
+  const updateField = (key: string, value: any) => {
+    setEditFields((prev) => ({ ...prev, [key]: value || null }))
+  }
+
+  const addScore = () => setEditScores((prev) => [...prev, { examType: '', overallScore: '' }])
+  const removeScore = (i: number) => setEditScores((prev) => prev.filter((_, idx) => idx !== i))
+  const updateScore = (i: number, field: keyof EditableTestScore, value: string) => {
+    setEditScores((prev) => {
+      const copy = [...prev]
+      copy[i] = { ...copy[i], [field]: value }
+      return copy
+    })
   }
 
   if (!profile) {
@@ -120,6 +289,8 @@ export default function ProfilePage() {
     )
   }
 
+  const completeness = computeCompleteness(profile)
+
   return (
     <div className="min-h-screen bg-background text-white">
       {/* Header */}
@@ -127,39 +298,23 @@ export default function ProfilePage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/')}
-                className="flex items-center gap-2"
-              >
+              <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Chat
+                Back
               </Button>
               <h1 className="text-xl font-semibold text-white">My Profile</h1>
             </div>
             {!isEditing ? (
-              <Button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2"
-              >
+              <Button onClick={startEditing} className="flex items-center gap-2">
                 <Edit2 className="h-4 w-4" />
                 Edit Profile
               </Button>
             ) : (
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                >
+                <Button variant="ghost" onClick={cancelEditing} disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="flex items-center gap-2"
-                >
+                <Button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2">
                   {isSaving ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   ) : (
@@ -176,7 +331,7 @@ export default function ProfilePage() {
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Profile Info */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Basic Information */}
             <motion.div
@@ -188,35 +343,34 @@ export default function ProfilePage() {
                 <User className="h-5 w-5 text-orange-500" />
                 Basic Information
               </h2>
-              
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-gray-400">Full Name</Label>
-                  <Input
-                    value={editedProfile?.name || ''}
-                    disabled
-                    className="mt-1 bg-background border-gray-800 text-gray-300"
-                  />
+                  <Label className="text-gray-400 text-sm">First Name</Label>
+                  {isEditing ? (
+                    <Input
+                      value={editFields.firstName || ''}
+                      onChange={(e) => updateField('firstName', e.target.value)}
+                      className="mt-1 bg-background border-gray-800 text-white"
+                    />
+                  ) : (
+                    <p className="mt-1 text-white">{profile.firstName}</p>
+                  )}
                 </div>
-
                 <div>
-                  <Label className="text-gray-400">Email</Label>
-                  <Input
-                    value={editedProfile?.email || ''}
-                    disabled
-                    className="mt-1 bg-background border-gray-800 text-gray-300"
-                  />
+                  <Label className="text-gray-400 text-sm">Last Name</Label>
+                  {isEditing ? (
+                    <Input
+                      value={editFields.lastName || ''}
+                      onChange={(e) => updateField('lastName', e.target.value)}
+                      className="mt-1 bg-background border-gray-800 text-white"
+                    />
+                  ) : (
+                    <p className="mt-1 text-white">{profile.lastName}</p>
+                  )}
                 </div>
-
-                <div>
-                  <Label className="text-gray-400">Preferred Name</Label>
-                  <Input
-                    value={editedProfile?.nickname || ''}
-                    onChange={(e) => setEditedProfile({ ...editedProfile!, nickname: e.target.value })}
-                    disabled={!isEditing}
-                    placeholder="How should Maya address you?"
-                    className="mt-1 bg-background border-gray-800 text-white"
-                  />
+                <div className="sm:col-span-2">
+                  <Label className="text-gray-400 text-sm">Email</Label>
+                  <p className="mt-1 text-gray-300">{profile.email}</p>
                 </div>
               </div>
             </motion.div>
@@ -232,41 +386,33 @@ export default function ProfilePage() {
                 <GraduationCap className="h-5 w-5 text-orange-500" />
                 Academic Profile
               </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-gray-400">Current Education Level</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <SelectField
+                  label="Degree Level"
+                  value={isEditing ? (editFields.degreeLevel ?? null) : profile.degreeLevel}
+                  options={DEGREE_OPTIONS}
+                  labelMap={DEGREE_LABELS}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('degreeLevel', v)}
+                />
+                <SelectField
+                  label="Field of Study"
+                  value={isEditing ? (editFields.fieldOfStudy ?? null) : profile.fieldOfStudy}
+                  options={FIELD_OPTIONS}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('fieldOfStudy', v)}
+                />
+                <div className="sm:col-span-2">
+                  <Label className="text-gray-400 text-sm">Current Education</Label>
                   {isEditing ? (
-                    <select
-                      value={editedProfile?.currentEducation || ''}
-                      onChange={(e) => setEditedProfile({ ...editedProfile!, currentEducation: e.target.value })}
-                      className="mt-1 w-full px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
-                    >
-                      <option value="">Select education level</option>
-                      {educationOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    <Input
+                      value={editFields.currentEducation || ''}
+                      onChange={(e) => updateField('currentEducation', e.target.value)}
+                      placeholder="e.g., B.Tech in CS from IIT Delhi"
+                      className="mt-1 bg-background border-gray-800 text-white"
+                    />
                   ) : (
                     <p className="mt-1 text-white">{profile.currentEducation || 'Not set'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label className="text-gray-400">Preferred Course/Field</Label>
-                  {isEditing ? (
-                    <select
-                      value={editedProfile?.preferredCourse || ''}
-                      onChange={(e) => setEditedProfile({ ...editedProfile!, preferredCourse: e.target.value })}
-                      className="mt-1 w-full px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
-                    >
-                      <option value="">Select preferred course</option>
-                      {courseOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="mt-1 text-white">{profile.preferredCourse || 'Not set'}</p>
                   )}
                 </div>
               </div>
@@ -276,91 +422,164 @@ export default function ProfilePage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.15 }}
               className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-800"
             >
               <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
                 <Globe className="h-5 w-5 text-orange-500" />
                 Study Abroad Plans
               </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-gray-400">Target Countries</Label>
-                  {isEditing ? (
-                    <div className="mt-2 space-y-2">
-                      {countryOptions.map(country => (
-                        <label key={country} className="flex items-center gap-2 text-white cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editedProfile?.targetCountries?.includes(country) || false}
-                            onChange={(e) => {
-                              const countries = editedProfile?.targetCountries || []
-                              if (e.target.checked) {
-                                setEditedProfile({ 
-                                  ...editedProfile!, 
-                                  targetCountries: [...countries, country] 
-                                })
-                              } else {
-                                setEditedProfile({ 
-                                  ...editedProfile!, 
-                                  targetCountries: countries.filter(c => c !== country) 
-                                })
-                              }
-                            }}
-                            className="rounded border-gray-600 bg-background text-orange-500 focus:ring-orange-500"
-                          />
-                          {country}
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-white">
-                      {profile.targetCountries?.join(', ') || 'Not set'}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label className="text-gray-400">Study Timeline</Label>
-                  {isEditing ? (
-                    <select
-                      value={editedProfile?.studyTimeline || ''}
-                      onChange={(e) => setEditedProfile({ ...editedProfile!, studyTimeline: e.target.value })}
-                      className="mt-1 w-full px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
-                    >
-                      <option value="">Select timeline</option>
-                      {timelineOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="mt-1 text-white">{profile.studyTimeline || 'Not set'}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label className="text-gray-400">Budget Range (per year)</Label>
-                  {isEditing ? (
-                    <select
-                      value={editedProfile?.budget || ''}
-                      onChange={(e) => setEditedProfile({ ...editedProfile!, budget: e.target.value })}
-                      className="mt-1 w-full px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
-                    >
-                      <option value="">Select budget</option>
-                      {budgetOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="mt-1 text-white">{profile.budget || 'Not set'}</p>
-                  )}
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <SelectField
+                  label="Target Country"
+                  value={isEditing ? (editFields.targetCountry ?? null) : profile.targetCountry}
+                  options={COUNTRY_OPTIONS}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('targetCountry', v)}
+                />
+                <SelectField
+                  label="Intake Season"
+                  value={isEditing ? (editFields.intakeSeason ?? null) : profile.intakeSeason}
+                  options={SEASON_OPTIONS}
+                  labelMap={SEASON_LABELS}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('intakeSeason', v)}
+                />
+                <SelectField
+                  label="Intake Year"
+                  value={isEditing ? String(editFields.intakeYear ?? '') : (profile.intakeYear ? String(profile.intakeYear) : null)}
+                  options={YEAR_OPTIONS.map(String)}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('intakeYear', v ? parseInt(v) : null)}
+                />
+                <SelectField
+                  label="Budget Range"
+                  value={isEditing ? (editFields.budgetRange ?? null) : profile.budgetRange}
+                  options={BUDGET_OPTIONS}
+                  labelMap={BUDGET_LABELS}
+                  isEditing={isEditing}
+                  onChange={(v) => updateField('budgetRange', v)}
+                />
               </div>
             </motion.div>
+
+            {/* Test Scores */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-800"
+            >
+              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-orange-500" />
+                Test Scores
+              </h2>
+
+              {isEditing ? (
+                <div className="space-y-3">
+                  {editScores.map((ts, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <select
+                        value={ts.examType}
+                        onChange={(e) => updateScore(i, 'examType', e.target.value)}
+                        className="flex-1 px-3 py-2 bg-background border border-gray-800 rounded-md text-white focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="">Select Exam</option>
+                        {EXAM_OPTIONS.map((exam) => (
+                          <option key={exam} value={exam}>{exam}</option>
+                        ))}
+                      </select>
+                      <Input
+                        type="number"
+                        placeholder="Score"
+                        value={ts.overallScore}
+                        onChange={(e) => updateScore(i, 'overallScore', e.target.value)}
+                        className="w-28 bg-background border-gray-800 text-white"
+                      />
+                      <button onClick={() => removeScore(i)} className="p-2 text-gray-400 hover:text-red-400 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={addScore} className="flex items-center gap-2 border-dashed border-gray-700">
+                    <Plus className="h-4 w-4" />
+                    Add Exam
+                  </Button>
+                </div>
+              ) : profile.testScores.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {profile.testScores.map((ts) => (
+                    <div key={ts.id} className="flex items-center gap-4 p-4 bg-background rounded-lg border border-gray-800">
+                      <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                        <ClipboardList className="h-5 w-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{ts.examType}</p>
+                        <p className="text-sm text-gray-400">
+                          Score: <span className="text-orange-400 font-semibold">{ts.overallScore}</span>
+                          {ts.dateTaken && (
+                            <span className="ml-2">
+                              &middot; {new Date(ts.dateTaken).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">No test scores added yet.</p>
+              )}
+            </motion.div>
+
+            {/* Agent-Extracted Profile Fields */}
+            {profile.profileFields.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-800"
+              >
+                <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-orange-500" />
+                  Extracted Profile Data
+                </h2>
+                <div className="space-y-3">
+                  {Object.entries(
+                    profile.profileFields.reduce<Record<string, ProfileField[]>>((acc, pf) => {
+                      const cat = pf.category
+                      if (!acc[cat]) acc[cat] = []
+                      acc[cat].push(pf)
+                      return acc
+                    }, {})
+                  ).map(([category, fields]) => (
+                    <div key={category}>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                        {CATEGORY_LABELS[category] ?? category}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {fields.map((pf) => (
+                          <div key={pf.id} className="flex items-center justify-between p-3 bg-background rounded-lg border border-gray-800">
+                            <div>
+                              <p className="text-sm text-gray-400">{pf.title}</p>
+                              <p className="text-white">{pf.value}</p>
+                            </div>
+                            {pf.extractedBy === 'AGENT' && (
+                              <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">
+                                AI
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
 
-          {/* Right Column - Profile Card & Settings */}
+          {/* Right Column */}
           <div className="space-y-6">
             {/* Profile Card */}
             <motion.div
@@ -370,76 +589,65 @@ export default function ProfilePage() {
             >
               <Avatar className="h-24 w-24 mx-auto mb-4">
                 <AvatarFallback className="text-2xl bg-orange-500/20 text-orange-500">
-                  {profile.name?.charAt(0) || 'U'}
+                  {profile.firstName?.charAt(0)}{profile.lastName?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <h3 className="text-xl font-semibold text-white">{profile.nickname || profile.name}</h3>
-              <p className="text-gray-400">{profile.email}</p>
-              
+              <h3 className="text-xl font-semibold text-white">
+                {profile.firstName} {profile.lastName}
+              </h3>
+              <p className="text-gray-400 text-sm">{profile.email}</p>
+
+              {profile.degreeLevel && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-300">
+                  <GraduationCap className="h-4 w-4 text-orange-500" />
+                  {DEGREE_LABELS[profile.degreeLevel]} &middot; {profile.fieldOfStudy || 'Undecided'}
+                </div>
+              )}
+
+              {(profile.intakeSeason || profile.targetCountry) && (
+                <div className="mt-1 flex items-center justify-center gap-2 text-sm text-gray-400">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {profile.intakeSeason && SEASON_LABELS[profile.intakeSeason]}{' '}
+                  {profile.intakeYear} &middot; {profile.targetCountry}
+                </div>
+              )}
+
               <div className="mt-6 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Profile Completion</span>
-                  <span className="text-orange-500 font-medium">85%</span>
+                  <span className="text-orange-500 font-medium">{completeness}%</span>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div className="bg-orange-500 h-2 rounded-full" style={{ width: '85%' }} />
+                  <div
+                    className="bg-orange-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${completeness}%` }}
+                  />
                 </div>
               </div>
             </motion.div>
 
-            {/* Account Settings */}
+            {/* Quick Stats */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
               className="bg-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-800"
             >
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Settings className="h-5 w-5 text-orange-500" />
-                Settings
-              </h2>
-              
-              <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-white mb-4">Quick Stats</h2>
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-gray-400" />
-                    <span className="text-white">Notifications</span>
-                  </div>
-                  <button
-                    onClick={() => setNotifications(!notifications)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      notifications ? "bg-orange-500" : "bg-gray-700"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                        notifications ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
+                  <span className="text-gray-400 text-sm">Test Scores</span>
+                  <span className="text-white font-medium">{profile.testScores.length}</span>
                 </div>
-
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Moon className="h-4 w-4 text-gray-400" />
-                    <span className="text-white">Dark Mode</span>
-                  </div>
-                  <button
-                    onClick={() => setDarkMode(!darkMode)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      darkMode ? "bg-orange-500" : "bg-gray-700"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                        darkMode ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
+                  <span className="text-gray-400 text-sm">Profile Fields</span>
+                  <span className="text-white font-medium">{profile.profileFields.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 text-sm">Budget</span>
+                  <span className="text-white font-medium">
+                    {profile.budgetRange ? BUDGET_LABELS[profile.budgetRange] : '—'}
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -456,7 +664,7 @@ export default function ProfilePage() {
                 <div>
                   <h3 className="font-medium text-white mb-1">Your Privacy Matters</h3>
                   <p className="text-sm text-gray-300">
-                    Your profile information helps Maya provide personalized guidance. 
+                    Your profile helps Maya and university counselors provide personalized guidance.
                     We never share your data with third parties.
                   </p>
                 </div>
