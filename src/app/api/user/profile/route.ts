@@ -36,7 +36,7 @@ export async function PUT(request: NextRequest) {
     const userId = session.user.id
 
     const allowedUserFields = [
-      'firstName', 'lastName', 'degreeLevel', 'fieldOfStudy',
+      'firstName', 'lastName', 'location', 'degreeLevel', 'fieldOfStudy',
       'currentEducation', 'targetCountry', 'intakeSeason',
       'intakeYear', 'budgetRange', 'hasGivenTests',
     ] as const

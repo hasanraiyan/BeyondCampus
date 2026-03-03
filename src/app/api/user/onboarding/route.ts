@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
+      location,
       degreeLevel,
       fieldOfStudy,
       currentEducation,
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       const user = await tx.user.update({
         where: { id: userId },
         data: {
+          location: location || null,
           degreeLevel: degreeLevel || null,
           fieldOfStudy: fieldOfStudy || null,
           currentEducation: currentEducation || null,

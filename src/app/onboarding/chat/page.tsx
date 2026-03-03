@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Volume2, VolumeX, X, Plus, Trash2 } from 'lucide-react'
+import { Mic, MicOff, Volume2, VolumeX, X, Plus, Trash2, SkipForward } from 'lucide-react'
 
 interface TestScoreEntry {
   examType: string
@@ -11,12 +11,14 @@ interface TestScoreEntry {
 }
 
 interface OnboardingData {
+  location?: string
   degreeLevel?: string
+  degreeLevelCustom?: string
   fieldOfStudy?: string
   currentEducation?: string
   targetCountry?: string
-  intakeSeason?: string
   intakeYear?: string
+  intakeSeason?: string
   budgetRange?: string
   hasGivenTests?: boolean
   testScores: TestScoreEntry[]
@@ -31,6 +33,8 @@ interface OnboardingStep {
   type: StepType
   options?: string[]
   optionMap?: Record<string, string>
+  hasOther?: boolean
+  otherPlaceholder?: string
 }
 
 const DEGREE_OPTIONS: Record<string, string> = {
@@ -61,28 +65,39 @@ const YEAR_OPTIONS = [
   String(currentYear + 1),
   String(currentYear + 2),
   String(currentYear + 3),
+  'Not Decided',
 ]
 
-const ONBOARDING_STEPS: OnboardingStep[] = [
+const ALL_STEPS: OnboardingStep[] = [
   {
     id: 'degreeLevel',
     question: "Hi! I'm Maya, your AI study abroad counselor. Let's get to know you. What degree are you planning to pursue?",
     field: 'degreeLevel',
     type: 'options',
-    options: Object.keys(DEGREE_OPTIONS),
+    options: [...Object.keys(DEGREE_OPTIONS), 'Not Decided', 'Other'],
     optionMap: DEGREE_OPTIONS,
+    hasOther: true,
+    otherPlaceholder: 'Type your degree type...',
   },
   {
     id: 'fieldOfStudy',
-    question: "Great choice! What field do you want to study?",
+    question: "What field do you want to study?",
     field: 'fieldOfStudy',
     type: 'options',
     options: ['Computer Science', 'Engineering', 'Business & Finance', 'Data Science & AI', 'Medicine & Health', 'Arts & Design', 'Law', 'Other'],
+    hasOther: true,
+    otherPlaceholder: 'Type your field of study...',
   },
   {
     id: 'currentEducation',
     question: "What's your current education? For example, 'B.Tech in CS from IIT Delhi'",
     field: 'currentEducation',
+    type: 'text',
+  },
+  {
+    id: 'location',
+    question: "Which city and state are you from?",
+    field: 'location',
     type: 'text',
   },
   {
@@ -93,19 +108,19 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     options: ['US', 'UK', 'Canada', 'Australia', 'Germany'],
   },
   {
+    id: 'intakeYear',
+    question: "Which year are you planning to start?",
+    field: 'intakeYear',
+    type: 'options',
+    options: YEAR_OPTIONS,
+  },
+  {
     id: 'intakeSeason',
-    question: "When are you planning to start?",
+    question: "Which intake do you plan?",
     field: 'intakeSeason',
     type: 'options',
     options: Object.keys(SEASON_OPTIONS),
     optionMap: SEASON_OPTIONS,
-  },
-  {
-    id: 'intakeYear',
-    question: "Which year?",
-    field: 'intakeYear',
-    type: 'options',
-    options: YEAR_OPTIONS,
   },
   {
     id: 'budgetRange',
@@ -123,7 +138,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'testScores',
-    question: "Add your test scores below. You can add multiple exams.",
+    question: "Add your test scores below. Click 'Add Exam' for each test you've taken.",
     field: 'testScores',
     type: 'test_scores',
   },
@@ -131,7 +146,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
 
 export default function OnboardingChat() {
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({ testScores: [] })
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -141,14 +156,25 @@ export default function OnboardingChat() {
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [showOptions, setShowOptions] = useState(false)
   const [textInput, setTextInput] = useState('')
+  const [showOtherInput, setShowOtherInput] = useState(false)
+  const [otherInput, setOtherInput] = useState('')
 
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<any>(null)
   const finalTranscriptRef = useRef<string>('')
 
-  const totalSteps = onboardingData.hasGivenTests === false
-    ? ONBOARDING_STEPS.length - 1
-    : ONBOARDING_STEPS.length
+  const getVisibleSteps = useCallback(() => {
+    return ALL_STEPS.filter(step => {
+      if (step.id === 'intakeSeason' && onboardingData.intakeYear === 'Not Decided') return false
+      if (step.id === 'testScores' && onboardingData.hasGivenTests === false) return false
+      return true
+    })
+  }, [onboardingData.intakeYear, onboardingData.hasGivenTests])
+
+  const visibleSteps = getVisibleSteps()
+  const currentStepData = visibleSteps[currentStepIndex]
+  const totalSteps = visibleSteps.length
+  const progress = ((currentStepIndex + 1) / totalSteps) * 100
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
@@ -184,7 +210,7 @@ export default function OnboardingChat() {
 
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       synthRef.current = window.speechSynthesis
-      setTimeout(() => speakMessage(ONBOARDING_STEPS[0].question), 1000)
+      setTimeout(() => speakMessage(ALL_STEPS[0].question), 1000)
     }
 
     return () => {
@@ -196,6 +222,8 @@ export default function OnboardingChat() {
   const speakMessage = (text: string) => {
     setCurrentCaption(text)
     setShowOptions(true)
+    setShowOtherInput(false)
+    setOtherInput('')
 
     if (!soundEnabled || !synthRef.current) return
 
@@ -235,42 +263,73 @@ export default function OnboardingChat() {
     setIsListening(false)
   }
 
-  const advanceStep = () => {
-    let nextStep = currentStep + 1
+  const advanceToNext = () => {
+    const steps = getVisibleSteps()
+    const nextIndex = currentStepIndex + 1
 
-    // Skip test_scores step if hasGivenTests is false
-    if (onboardingData.hasGivenTests === false && ONBOARDING_STEPS[nextStep]?.type === 'test_scores') {
+    if (nextIndex >= steps.length) {
       completeOnboarding()
       return
     }
 
-    if (nextStep >= ONBOARDING_STEPS.length) {
-      completeOnboarding()
-      return
-    }
-
-    setCurrentStep(nextStep)
+    setCurrentStepIndex(nextIndex)
     setTimeout(() => {
       setUserCaption('')
-      speakMessage(ONBOARDING_STEPS[nextStep].question)
+      speakMessage(steps[nextIndex].question)
     }, 1500)
   }
 
   const handleUserInput = (input: string) => {
-    const step = ONBOARDING_STEPS[currentStep]
-    setOnboardingData(prev => ({ ...prev, [step.field]: input }))
+    if (!currentStepData) return
+    setOnboardingData(prev => ({ ...prev, [currentStepData.field]: input }))
     setShowOptions(false)
-    advanceStep()
+    advanceToNext()
   }
 
   const handleOptionClick = (option: string) => {
-    const step = ONBOARDING_STEPS[currentStep]
-    setUserCaption(option)
+    if (!currentStepData) return
 
-    const value = step.optionMap ? step.optionMap[option] : option
-    setOnboardingData(prev => ({ ...prev, [step.field]: value }))
+    if (option === 'Other' && currentStepData.hasOther) {
+      setShowOtherInput(true)
+      return
+    }
+
+    if (option === 'Not Decided') {
+      setUserCaption('Not Decided')
+      setOnboardingData(prev => {
+        const updated = { ...prev }
+        if (currentStepData.id === 'degreeLevel') {
+          updated.degreeLevel = undefined
+        } else if (currentStepData.id === 'intakeYear') {
+          updated.intakeYear = 'Not Decided'
+        }
+        return updated
+      })
+      setShowOptions(false)
+      advanceToNext()
+      return
+    }
+
+    setUserCaption(option)
+    const value = currentStepData.optionMap ? currentStepData.optionMap[option] : option
+    setOnboardingData(prev => ({ ...prev, [currentStepData.field]: value }))
     setShowOptions(false)
-    advanceStep()
+    advanceToNext()
+  }
+
+  const handleOtherSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!otherInput.trim() || !currentStepData) return
+    setUserCaption(otherInput.trim())
+    if (currentStepData.id === 'degreeLevel') {
+      setOnboardingData(prev => ({ ...prev, degreeLevel: undefined, degreeLevelCustom: otherInput.trim() }))
+    } else {
+      setOnboardingData(prev => ({ ...prev, [currentStepData.field]: otherInput.trim() }))
+    }
+    setShowOptions(false)
+    setShowOtherInput(false)
+    setOtherInput('')
+    advanceToNext()
   }
 
   const handleYesNo = (answer: boolean) => {
@@ -281,12 +340,15 @@ export default function OnboardingChat() {
     if (!answer) {
       setTimeout(() => completeOnboarding(), 1500)
     } else {
-      const nextStep = currentStep + 1
-      setCurrentStep(nextStep)
-      setTimeout(() => {
-        setUserCaption('')
-        speakMessage(ONBOARDING_STEPS[nextStep].question)
-      }, 1500)
+      const steps = getVisibleSteps()
+      const nextIndex = currentStepIndex + 1
+      if (nextIndex < steps.length) {
+        setCurrentStepIndex(nextIndex)
+        setTimeout(() => {
+          setUserCaption('')
+          speakMessage(steps[nextIndex].question)
+        }, 1500)
+      }
     }
   }
 
@@ -314,7 +376,14 @@ export default function OnboardingChat() {
 
   const handleTestScoresSubmit = () => {
     const valid = onboardingData.testScores.filter(ts => ts.examType && ts.overallScore)
+    if (valid.length === 0) return
     setOnboardingData(prev => ({ ...prev, testScores: valid }))
+    setShowOptions(false)
+    completeOnboarding()
+  }
+
+  const handleTestScoresSkip = () => {
+    setOnboardingData(prev => ({ ...prev, testScores: [] }))
     setShowOptions(false)
     completeOnboarding()
   }
@@ -332,13 +401,17 @@ export default function OnboardingChat() {
     speakMessage("Excellent! I've got everything I need. Let me set up your personalized experience...")
 
     try {
+      const degreeRaw = onboardingData.degreeLevel
+      const isStandardDegree = degreeRaw && ['UG', 'PG', 'MBA', 'PHD'].includes(degreeRaw)
+
       const payload: Record<string, any> = {
-        degreeLevel: onboardingData.degreeLevel,
+        location: onboardingData.location,
+        degreeLevel: isStandardDegree ? degreeRaw : null,
         fieldOfStudy: onboardingData.fieldOfStudy,
         currentEducation: onboardingData.currentEducation,
         targetCountry: onboardingData.targetCountry,
         intakeSeason: onboardingData.intakeSeason,
-        intakeYear: onboardingData.intakeYear,
+        intakeYear: onboardingData.intakeYear === 'Not Decided' ? null : onboardingData.intakeYear,
         budgetRange: onboardingData.budgetRange,
         hasGivenTests: onboardingData.hasGivenTests,
       }
@@ -376,18 +449,17 @@ export default function OnboardingChat() {
     }
   }
 
-  const currentStepData = ONBOARDING_STEPS[currentStep]
-  const progress = ((currentStep + 1) / totalSteps) * 100
+  if (!currentStepData) return null
+
+  const hasValidScores = onboardingData.testScores.some(ts => ts.examType && ts.overallScore)
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0a0a] relative overflow-hidden">
-      {/* Background gradient effects */}
       <div className="absolute inset-0">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-yellow-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      {/* Progress bar */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-gray-900">
         <motion.div
           className="h-full bg-gradient-to-r from-orange-500 to-yellow-500"
@@ -397,7 +469,6 @@ export default function OnboardingChat() {
         />
       </div>
 
-      {/* Close button */}
       <button
         onClick={() => router.push('/')}
         className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors z-20"
@@ -405,19 +476,12 @@ export default function OnboardingChat() {
         <X className="h-6 w-6" />
       </button>
 
-      {/* Main content */}
       <div className="relative z-10 flex flex-col items-center w-full max-w-4xl px-4 pb-48">
-        {/* Animated Gradient Orb */}
+        {/* Orb */}
         <motion.div
           className="relative w-48 h-48 mb-8"
-          animate={{
-            scale: isSpeaking ? [1, 1.1, 1] : isListening ? [1, 1.05, 1] : 1,
-          }}
-          transition={{
-            duration: isSpeaking ? 1.5 : 2,
-            repeat: isSpeaking || isListening ? Infinity : 0,
-            ease: "easeInOut",
-          }}
+          animate={{ scale: isSpeaking ? [1, 1.1, 1] : isListening ? [1, 1.05, 1] : 1 }}
+          transition={{ duration: isSpeaking ? 1.5 : 2, repeat: isSpeaking || isListening ? Infinity : 0, ease: "easeInOut" }}
         >
           <div className="absolute inset-0 rounded-full bg-gradient-to-br from-orange-400 via-orange-500 to-yellow-500 opacity-80 blur-xl" />
           <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-300 via-white to-yellow-400 opacity-60 blur-md" />
@@ -426,12 +490,12 @@ export default function OnboardingChat() {
             {(isSpeaking || isListening) && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="flex gap-1">
-                  {[0, 1, 2, 3, 4].map((index) => (
+                  {[0, 1, 2, 3, 4].map((i) => (
                     <motion.div
-                      key={`wave-${index}`}
+                      key={`wave-${i}`}
                       className="w-1 bg-white/60 rounded-full"
                       animate={{ height: isSpeaking ? ['20px', '40px', '20px'] : ['15px', '30px', '15px'] }}
-                      transition={{ duration: 0.5, repeat: Infinity, delay: index * 0.1 }}
+                      transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
                     />
                   ))}
                 </div>
@@ -444,68 +508,85 @@ export default function OnboardingChat() {
         <div className="w-full max-w-2xl px-4 mb-6">
           <AnimatePresence mode="wait">
             {currentCaption && (
-              <motion.div
-                key={`caption-${currentStep}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center mb-4"
-              >
+              <motion.div key={`caption-${currentStepIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="text-center mb-4">
                 <p className="text-xl text-white/90 leading-relaxed">{currentCaption}</p>
               </motion.div>
             )}
             {userCaption && (
-              <motion.div
-                key="user-caption"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center"
-              >
+              <motion.div key="user-caption" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="text-center">
                 <p className="text-lg text-gray-400 italic">&ldquo;{userCaption}&rdquo;</p>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        {/* Options / Inputs */}
+        {/* Interactive area */}
         <AnimatePresence mode="wait">
+          {/* Options */}
           {showOptions && !isProcessing && currentStepData.type === 'options' && currentStepData.options && (
-            <motion.div
-              key={`options-${currentStep}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-3xl px-4 mb-8"
-            >
-              <p className="text-center text-sm text-gray-400 mb-6">Choose an option or type your own answer:</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {currentStepData.options.map((option, index) => (
-                  <motion.button
-                    key={`${currentStep}-${option}`}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.08 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleOptionClick(option)}
-                    className="px-6 py-4 bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm border border-orange-500/40 rounded-2xl text-white hover:from-orange-500/20 hover:to-orange-500/10 hover:border-orange-500/60 transition-all font-medium shadow-lg hover:shadow-orange-500/20"
-                  >
-                    {option}
-                  </motion.button>
-                ))}
-              </div>
+            <motion.div key={`options-${currentStepIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-3xl px-4 mb-8">
+              {!showOtherInput && (
+                <>
+                  <p className="text-center text-sm text-gray-400 mb-6">Choose an option:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {currentStepData.options.map((option, index) => {
+                      const isSecondary = option === 'Not Decided' || option === 'Other'
+                      return (
+                        <motion.button
+                          key={`${currentStepIndex}-${option}`}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.08 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleOptionClick(option)}
+                          className={`px-6 py-4 backdrop-blur-sm rounded-2xl text-white transition-all font-medium shadow-lg ${
+                            isSecondary
+                              ? 'bg-white/5 border border-dashed border-white/20 hover:border-white/40 text-gray-300'
+                              : 'bg-gradient-to-b from-white/10 to-white/5 border border-orange-500/40 hover:from-orange-500/20 hover:to-orange-500/10 hover:border-orange-500/60 hover:shadow-orange-500/20'
+                          }`}
+                        >
+                          {option}
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {showOtherInput && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                  <p className="text-center text-sm text-gray-400 mb-4">Tell us more:</p>
+                  <form onSubmit={handleOtherSubmit} className="flex gap-3">
+                    <input
+                      type="text"
+                      value={otherInput}
+                      onChange={(e) => setOtherInput(e.target.value)}
+                      placeholder={currentStepData.otherPlaceholder || 'Type here...'}
+                      autoFocus
+                      className="flex-1 px-5 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 text-lg"
+                    />
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={!otherInput.trim()}
+                      className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Continue
+                    </motion.button>
+                  </form>
+                  <button onClick={() => setShowOtherInput(false)} className="mt-3 text-sm text-gray-500 hover:text-gray-300 transition-colors mx-auto block">
+                    &larr; Back to options
+                  </button>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
+          {/* Yes/No */}
           {showOptions && !isProcessing && currentStepData.type === 'yes_no' && (
-            <motion.div
-              key={`yesno-${currentStep}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-md px-4 mb-8"
-            >
+            <motion.div key={`yesno-${currentStepIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-md px-4 mb-8">
               <div className="grid grid-cols-2 gap-4">
                 <motion.button
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -532,26 +613,16 @@ export default function OnboardingChat() {
             </motion.div>
           )}
 
+          {/* Test Scores */}
           {showOptions && !isProcessing && currentStepData.type === 'test_scores' && (
-            <motion.div
-              key={`scores-${currentStep}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-2xl px-4 mb-8"
-            >
+            <motion.div key={`scores-${currentStepIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="w-full max-w-2xl px-4 mb-8">
               <div className="space-y-4">
                 {onboardingData.testScores.map((ts, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-3"
-                  >
+                  <motion.div key={index} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
                     <select
                       value={ts.examType}
                       onChange={(e) => handleTestScoreChange(index, 'examType', e.target.value)}
-                      className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-orange-500/50 appearance-none"
+                      className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-orange-500/50"
                     >
                       <option value="" className="bg-gray-900">Select Exam</option>
                       {EXAM_OPTIONS.map(exam => (
@@ -565,10 +636,7 @@ export default function OnboardingChat() {
                       onChange={(e) => handleTestScoreChange(index, 'overallScore', e.target.value)}
                       className="w-32 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50"
                     />
-                    <button
-                      onClick={() => removeTestScore(index)}
-                      className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                    >
+                    <button onClick={() => removeTestScore(index)} className="p-2 text-gray-400 hover:text-red-400 transition-colors">
                       <Trash2 className="h-5 w-5" />
                     </button>
                   </motion.div>
@@ -584,14 +652,26 @@ export default function OnboardingChat() {
                     <Plus className="h-4 w-4" />
                     Add Exam
                   </motion.button>
+                  {hasValidScores && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleTestScoresSubmit}
+                      className="flex-1 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-xl transition-all"
+                    >
+                      Continue
+                    </motion.button>
+                  )}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={handleTestScoresSubmit}
-                    disabled={onboardingData.testScores.length === 0}
-                    className="flex-1 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={handleTestScoresSkip}
+                    className="flex items-center gap-2 px-5 py-3 bg-white/5 border border-white/20 rounded-xl text-gray-400 hover:text-white hover:border-white/40 transition-all"
                   >
-                    {onboardingData.testScores.length === 0 ? 'Skip for now' : 'Continue'}
+                    <SkipForward className="h-4 w-4" />
+                    Skip
                   </motion.button>
                 </div>
               </div>
@@ -599,13 +679,8 @@ export default function OnboardingChat() {
           )}
         </AnimatePresence>
 
-        {/* Idle instruction */}
         {!isSpeaking && !isListening && !userCaption && !showOptions && !isProcessing && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-gray-400 text-sm mt-6"
-          >
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-gray-400 text-sm mt-6">
             Tap the microphone to speak or type below
           </motion.p>
         )}
@@ -628,14 +703,10 @@ export default function OnboardingChat() {
             >
               {isListening ? <MicOff className="h-7 w-7 text-white" /> : <Mic className="h-7 w-7 text-white" />}
             </motion.button>
-
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={() => {
-                setSoundEnabled(!soundEnabled)
-                synthRef.current?.cancel()
-              }}
+              onClick={() => { setSoundEnabled(!soundEnabled); synthRef.current?.cancel() }}
               className="p-5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all"
             >
               {soundEnabled ? <Volume2 className="h-7 w-7 text-white" /> : <VolumeX className="h-7 w-7 text-white" />}
