@@ -14,6 +14,10 @@ export const database = {
   async getUser(userId: string) {
     return prisma.user.findUnique({
       where: { id: userId },
+      include: {
+        testScores: { orderBy: { createdAt: 'desc' } },
+        profileFields: { orderBy: { createdAt: 'desc' } },
+      },
     })
   },
 
