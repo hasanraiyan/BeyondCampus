@@ -49,14 +49,27 @@ export async function POST(
               const content = event.data?.chunk?.content;
               if (content) {
                 const text = typeof content === 'string' ? content : JSON.stringify(content);
-                controller.enqueue(encoder.encode(text));
+                try {
+                  controller.enqueue(encoder.encode(text));
+                } catch (e) {
+                  // Controller might be closed if client disconnected
+                  break;
+                }
               }
             }
           }
-          controller.close();
+          try {
+            controller.close();
+          } catch (e) {
+            // Already closed
+          }
         } catch (e) {
           console.error('Stream error:', e);
-          controller.error(e);
+          try {
+            controller.error(e);
+          } catch (err) {
+            // Already errored or closed
+          }
         }
       },
     });

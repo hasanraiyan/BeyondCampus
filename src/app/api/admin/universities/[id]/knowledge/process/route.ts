@@ -8,30 +8,30 @@ import { z } from 'zod';
 const DeadlineSchema = z.object({
   roundName: z.string().describe('Name of the application round (e.g. Round 1, Early Action, Fall 2024)'),
   applicationDeadline: z.string().describe('ISO date string (YYYY-MM-DDT00:00:00Z). If only month/year is given, use the 1st of the month.'),
-  decisionDate: z.string().optional().nullable().describe('ISO date string (YYYY-MM-DDT00:00:00Z)'),
+  decisionDate: z.string().nullable().describe('ISO date string (YYYY-MM-DDT00:00:00Z)'),
 });
 
 const ProgramSchema = z.object({
   name: z.string().describe('Full name of the academic program'),
-  department: z.string().optional().nullable().describe('Department offering the program'),
+  department: z.string().nullable().describe('Department offering the program'),
   degreeType: z.enum(['BS', 'MS', 'MBA', 'PHD', 'ASSOCIATE', 'CERTIFICATE']).describe('Degree type (must be one of the enums)'),
-  durationMonths: z.number().optional().nullable().describe('Duration of the program in months'),
-  tuitionPerYear: z.number().optional().nullable().describe('Tuition cost per year in USD'),
+  durationMonths: z.number().nullable().describe('Duration of the program in months'),
+  tuitionPerYear: z.number().nullable().describe('Tuition cost per year in USD'),
   deadlines: z.array(DeadlineSchema).describe('List of application deadlines for this program'),
 });
 
 const ScholarshipSchema = z.object({
   name: z.string().describe('Name of the scholarship'),
-  amount: z.string().optional().nullable().describe('Amount or value of the scholarship (e.g. $10,000, Full Tuition)'),
-  description: z.string().optional().nullable().describe('Brief description of the scholarship'),
-  deadline: z.string().optional().nullable().describe('ISO date string for the application deadline'),
-  eligibility: z.string().optional().nullable().describe('Eligibility criteria for the scholarship'),
+  amount: z.string().nullable().describe('Amount or value of the scholarship (e.g. $10,000, Full Tuition)'),
+  description: z.string().nullable().describe('Brief description of the scholarship'),
+  deadline: z.string().nullable().describe('ISO date string for the application deadline'),
+  eligibility: z.string().nullable().describe('Eligibility criteria for the scholarship'),
 });
 
 const ExtractionSchema = z.object({
   programs: z.array(ProgramSchema).describe('List of academic programs accurately extracted from the text'),
   scholarships: z.array(ScholarshipSchema).describe('List of scholarships extracted from the text'),
-  universityDescription: z.string().optional().nullable().describe('A refined, high-level summary of the university based on Campus Life and Staff docs'),
+  universityDescription: z.string().nullable().describe('A refined, high-level summary of the university based on Campus Life and Staff docs'),
 });
 
 // ─── API Handler ───────────────────────────────────────────────
