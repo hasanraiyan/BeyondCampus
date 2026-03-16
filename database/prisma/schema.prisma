@@ -267,6 +267,7 @@ model University {
   shortlists    Shortlist[]
   applications  Application[]
   knowledgeDocs UniversityKnowledgeDoc[]
+  scholarships  Scholarship[]
 
   @@index([state])
 }
@@ -359,3 +360,20 @@ model ChecklistItem {
 
   @@index([applicationId, status])
 }
+
+model Scholarship {
+  id           String   @id @default(uuid())
+  universityId String
+  name         String
+  amount       String?
+  description  String?
+  deadline     DateTime?
+  eligibility  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@index([universityId])
+}
+

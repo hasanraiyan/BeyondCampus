@@ -10,6 +10,7 @@ import {
   Trash2,
   ExternalLink,
   GraduationCap,
+  Library,
   Filter,
   ArrowUpDown,
 } from 'lucide-react';
@@ -261,6 +262,11 @@ export default function UniversitiesListing() {
                               <DropdownMenuItem className="gap-2 cursor-pointer">
                                 <GraduationCap className="h-4 w-4" /> Manage
                                 Programs
+                              </DropdownMenuItem>
+                            </Link>
+                            <Link href={`/admin/universities/${u.id}/knowledge`}>
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-primary focus:text-primary">
+                                <Library className="h-4 w-4" /> Manage Knowledge
                               </DropdownMenuItem>
                             </Link>
                             <DropdownMenuItem

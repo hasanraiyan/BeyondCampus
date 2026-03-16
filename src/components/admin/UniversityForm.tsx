@@ -232,6 +232,16 @@ export default function UniversityForm({
               />
             </div>
           </div>
+          {isEditing && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/admin/universities/${initialData.id}/knowledge`)}
+              className="mr-2 border-primary/20 hover:bg-primary/10 text-primary transition-all rounded-2xl h-14 px-6 font-bold"
+            >
+              Manage Knowledge
+            </Button>
+          )}
           <Button
             type="submit"
             disabled={loading || (!hasChanges && isEditing)}

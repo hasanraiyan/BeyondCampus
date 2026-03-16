@@ -15,7 +15,7 @@ export const embeddings = new GoogleGenerativeAIEmbeddings({
 
 /**
  * Checks if a Qdrant collection exists for the given universityId.
- * If it doesn't, creates it (size: 768, distance: 'Cosine').
+ * If it doesn't, creates it (size: 3072, distance: 'Cosine').
  */
 export async function ensureCollection(universityId: string) {
   const collectionName = `university_${universityId}`;
@@ -25,7 +25,7 @@ export async function ensureCollection(universityId: string) {
     if (!exists.exists) {
       await qdrantClient.createCollection(collectionName, {
         vectors: {
-          size: 768,
+          size: 3072,
           distance: 'Cosine',
         },
       });
