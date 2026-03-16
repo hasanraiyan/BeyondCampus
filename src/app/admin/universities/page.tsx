@@ -175,6 +175,11 @@ export default function UniversitiesListing() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-[#0f0f0f] border-gray-800 text-white">
+                            <Link href={`/admin/universities/${u.id}/programs`}>
+                              <DropdownMenuItem className="gap-2 cursor-pointer">
+                                <GraduationCap className="h-4 w-4" /> Manage Programs
+                              </DropdownMenuItem>
+                            </Link>
                             <DropdownMenuItem className="gap-2" onClick={() => window.open(u.website, '_blank')}>
                               <ExternalLink className="h-4 w-4" /> Visit Website
                             </DropdownMenuItem>

@@ -55,30 +55,4 @@ export class UniversityService {
       where: { id }
     })
   }
-
-  /**
-   * PROGRAM MANAGEMENT
-   */
-
-  static async addProgramToUniversity(universityId: string, programData: Partial<Program>) {
-    return await prisma.program.create({
-      data: {
-        ...programData as any,
-        universityId
-      }
-    })
-  }
-
-  static async updateProgram(programId: string, programData: Partial<Program>) {
-    return await prisma.program.update({
-      where: { id: programId },
-      data: programData as any
-    })
-  }
-
-  static async deleteProgram(programId: string) {
-    return await prisma.program.delete({
-      where: { id: programId }
-    })
-  }
 }
