@@ -629,7 +629,7 @@ export default function UniversityForm({
                           />
                           <div className="flex gap-2 mt-4 flex-wrap">
                             {formData.specialties.split(',').map(
-                              (s, i) =>
+                              (s: string, i: number) =>
                                 s.trim() && (
                                   <div
                                     key={i}
