@@ -112,9 +112,48 @@ export default function MayaCommandBar({
     }
   }
 
-  const handleQuestion = (question: string) => {
-    onAction?.({ type: 'question', content: question, context })
+  const handleQuestion = async (question: string) => {
+    onAction?.({ type: 'question', content: question, context });
+    
+    try {
+      const response = await fetch('/api/maya/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: question }],
+          context: context
+        }),
+      });
+
+      if (response.ok && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+
+        let fullContent = "";
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          const chunkValue = decoder.decode(value, { stream: !done });
+          
+          if (chunkValue) {
+            fullContent += chunkValue;
+            onAction?.({ 
+              type: 'maya_message', 
+              content: fullContent,
+              chunk: chunkValue,
+              isComplete: done
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Maya Command Bar Error:", error);
+    }
   }
+
+
 
   return (
     <div className={cn("relative w-full max-w-4xl mx-auto", className)}>

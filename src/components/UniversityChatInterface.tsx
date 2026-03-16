@@ -120,7 +120,8 @@ export default function UniversityChatInterface({ universityId }: UniversityChat
     }
   }, [messages])
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
+
     if (!inputMessage.trim()) return
 
     const newMessage: Message = {
@@ -134,24 +135,64 @@ export default function UniversityChatInterface({ universityId }: UniversityChat
     setInputMessage("")
 
     if (!university) return
-    // Simulate counselor response
-    setTimeout(() => {
-      const responses = [
-        `Great question! At ${university.name}, we're looking for students who are passionate about ${university.specialties[0]?.toLowerCase() || 'innovation'} and innovation. What specific program interests you most?`,
-        `I'd be happy to help you with your ${university.name} application! Our ${university.specialties.join(", ").toLowerCase()} programs are among the best in the world. What's your academic background?`,
-        `That's a fantastic area of interest! ${university.name} has incredible opportunities in that field. Have you considered our research programs and internship opportunities?`,
-        `Excellent! With our ${university.admissionRate} admission rate, we're quite selective, but we look at each application holistically. Tell me more about your achievements and goals.`
-      ]
 
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date(),
+    // Call Maya API
+    try {
+      const response = await fetch('/api/maya/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, newMessage].map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          universityId: university.id,
+        }),
+      });
+
+      if (response.ok && response.body) {
+        // Initialize AI response
+        const aiMessageId = Date.now().toString();
+        const initialAiResponse: Message = {
+          id: aiMessageId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, initialAiResponse]);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false;
+
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          const chunkValue = decoder.decode(value, { stream: !done });
+          
+          if (chunkValue) {
+            setMessages(prev => prev.map(m => 
+              m.id === aiMessageId 
+                ? { ...m, content: m.content + chunkValue }
+                : m
+            ));
+          }
+        }
+      } else {
+        throw new Error("Failed to get response from Maya");
       }
 
-      setMessages(prev => [...prev, aiResponse])
-    }, 1500)
+    } catch (error) {
+      console.error("Chat Error:", error);
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+
   }
 
   if (isLoading || !university) {
