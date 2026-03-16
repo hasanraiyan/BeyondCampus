@@ -3,18 +3,24 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, ArrowUp, Mic, MicOff, Command } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
 
 interface MayaCommandBarProps {
   context?: 'universities' | 'profile' | 'applications' | 'general'
   onAction?: (action: any) => void
   placeholder?: string
+  className?: string
 }
+
 
 export default function MayaCommandBar({ 
   context = 'general', 
   onAction,
-  placeholder = "Ask Maya anything or type a command..."
+  placeholder = "Ask Maya anything or type a command...",
+  className
 }: MayaCommandBarProps) {
+
   const [query, setQuery] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -111,7 +117,8 @@ export default function MayaCommandBar({
   }
 
   return (
-    <div className="relative w-full max-w-4xl mx-auto">
+    <div className={cn("relative w-full max-w-4xl mx-auto", className)}>
+
       <motion.div
         initial={false}
         animate={{

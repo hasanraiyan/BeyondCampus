@@ -124,31 +124,26 @@ export default function UniversitiesPage() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-[#0a0a0a]">
-          <div className="px-8 py-12">
-            <div className="max-w-4xl">
-              <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
+        {/* Sticky Header with Search */}
+        <div className={cn(
+          "sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-gray-800/50 transition-all duration-300",
+          isScrolled && "shadow-2xl shadow-black/90 ring-1 ring-white/5"
+        )}>
+          <div className="px-8 py-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="max-w-2xl">
+              <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">
                 Welcome back
               </h1>
-              <p className="text-lg text-gray-400 font-medium">
-                Discover your perfect university match from over 1,000 institutions worldwide
+              <p className="text-sm text-gray-400 font-medium">
+                Discover institutions worldwide
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#050505] relative">
-          {/* Maya Command Bar - Sticky */}
-          <div className={cn(
-            "sticky top-0 z-40 bg-[#0a0a0a] border-b border-gray-800/50 transition-shadow duration-300",
-            isScrolled && "shadow-xl shadow-black/80 ring-1 ring-white/5"
-          )}>
-            <div className="px-8 py-8">
+            
+            <div className="flex-1 max-w-xl self-end md:self-center">
               <MayaCommandBar
+                className="max-w-none mx-0"
                 context="universities"
-                placeholder="Ask about universities, rankings, or programs..."
+                placeholder="Search universities..."
                 onAction={(action) => {
                   if (action.type === 'navigate') {
                     router.push(action.page)
@@ -157,7 +152,12 @@ export default function UniversitiesPage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Content Area */}
+        <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#050505] relative">
           <div className="p-8">
+
             {isLoading ? (
               <div className="space-y-20">
                 <section>
