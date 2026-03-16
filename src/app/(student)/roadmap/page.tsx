@@ -329,25 +329,15 @@ const roadmapPhases: RoadmapPhase[] = [
   }
 ]
 
-function User() {
-  return null
-}
-
 export default function RoadmapPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(true)
   const [expandedPhases, setExpandedPhases] = useState<string[]>(['profile_prep'])
   const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === 'loading') return
-    if (!session) {
-      router.push('/auth/signin')
-    } else {
-      setLoading(false)
-    }
-  }, [session, status, router])
+    setLoading(false)
+  }, [])
 
   const togglePhase = (phaseId: string) => {
     setExpandedPhases(prev => 
@@ -363,39 +353,23 @@ export default function RoadmapPage() {
     return (startMonth / totalMonths) * 100
   }
 
-  const getPhaseWidth = (duration: number) => {
-    const totalMonths = 12
-    return (duration / totalMonths) * 100
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading roadmap...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="flex-1 overflow-y-auto text-white">
       {/* Header */}
-      <div className="border-b border-gray-800 backdrop-blur-sm sticky top-0 z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+      <div className="border-b border-border/30 backdrop-blur-sm sticky top-0 z-10" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Chat
-              </Button>
-              <div className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-orange-500" />
-                <h1 className="text-xl font-semibold">Study Abroad Roadmap</h1>
-              </div>
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-orange-500" />
+              <h1 className="text-xl font-semibold">Study Abroad Roadmap</h1>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Calendar className="h-4 w-4" />

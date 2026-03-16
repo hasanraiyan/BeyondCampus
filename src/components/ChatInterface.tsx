@@ -19,6 +19,8 @@ import { Plus, Menu, ChevronDown, Compass, Briefcase, TrendingUp, MessageSquare,
 import { cn } from '@/lib/utils'
 import AppSidebar from './AppSidebar'
 import type { NavItem } from './AppSidebar'
+import { useSidebar } from "@/contexts/SidebarContext"
+import { usePathname } from "next/navigation"
 
 interface Message {
   id: string
@@ -141,6 +143,61 @@ export default function ChatInterface() {
     }
   }, [session])
 
+  const { setHeaderAction, setBottomContent } = useSidebar()
+
+  useEffect(() => {
+    // Set Header Action
+    setHeaderAction(
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={createNewChat}
+        className="h-8 w-8 hover:bg-secondary/70 transition-colors opacity-70 hover:opacity-100"
+        aria-label="Create new chat"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+    )
+
+    // Set Bottom Content
+    setBottomContent(
+      <div className="border-t border-border/30 mt-4">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-widest">Recent Chats</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={createNewChat}
+            className="h-6 w-6 hover:bg-secondary/70 opacity-60 hover:opacity-100"
+            aria-label="Start new chat"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="max-h-64 overflow-y-auto px-4 pb-3">
+          <div className="space-y-1">
+            {chats.map((chat) => (
+              <Button
+                key={chat.id}
+                variant={currentChatId === chat.id ? "secondary" : "ghost"}
+                className="w-full justify-start text-left group hover:bg-secondary/50 h-10 px-4 rounded-md"
+                onClick={() => setCurrentChatId(chat.id)}
+              >
+                <span className="text-[15px] truncate">{chat.title}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+
+    // Cleanup
+    return () => {
+      setHeaderAction(null)
+      setBottomContent(null)
+    }
+  }, [chats, currentChatId, setHeaderAction, setBottomContent])
+
   // Typing animation effect
   useEffect(() => {
     const fullText = "Welcome to BeyondCampus"
@@ -238,63 +295,7 @@ export default function ChatInterface() {
 
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      {sidebarOpen && (
-        <AppSidebar
-          navItems={[
-            { label: "Home", icon: Home, href: "/" },
-            { label: "Explore People", icon: Compass, href: "/explore" },
-            { label: "Universities", icon: GraduationCap, href: "/universities" },
-            { label: "My Workspace", icon: LayoutDashboard, href: "/workspace" },
-            { label: "Roadmap", icon: Target, href: "/roadmap" },
-            { label: "Applications", icon: GraduationCap, href: "/applications" },
-            { label: "Documents", icon: Lock, href: "/documents" },
-          ]}
-          activeItem="Home"
-          headerAction={
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={createNewChat}
-              className="h-8 w-8 hover:bg-secondary/70 transition-colors opacity-70 hover:opacity-100"
-              aria-label="Create new chat"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          }
-          bottomContent={
-            <div className="border-t border-border/30 mt-4">
-              <div className="px-4 py-3 flex items-center justify-between">
-                <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-widest">Recent Chats</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={createNewChat}
-                  className="h-6 w-6 hover:bg-secondary/70 opacity-60 hover:opacity-100"
-                  aria-label="Start new chat"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-              <div className="max-h-64 overflow-y-auto px-4 pb-3">
-                <div className="space-y-1">
-                  {chats.map((chat) => (
-                    <Button
-                      key={chat.id}
-                      variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                      className="w-full justify-start text-left group hover:bg-secondary/50 h-10 px-4 rounded-md"
-                      onClick={() => setCurrentChatId(chat.id)}
-                    >
-                      <span className="text-[15px] truncate">{chat.title}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          }
-        />
-      )}
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">

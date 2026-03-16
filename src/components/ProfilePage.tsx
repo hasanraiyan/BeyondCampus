@@ -187,11 +187,6 @@ export default function ProfilePage() {
   const [editScores, setEditScores] = useState<EditableTestScore[]>([])
 
   useEffect(() => {
-    if (status === 'loading') return
-    if (!session) router.push('/auth/signin')
-  }, [session, status, router])
-
-  useEffect(() => {
     fetchProfile()
   }, [])
 
@@ -283,7 +278,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading...</div>
       </div>
     )
@@ -292,18 +287,12 @@ export default function ProfilePage() {
   const completeness = computeCompleteness(profile)
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="flex-1 overflow-y-auto text-white">
       {/* Header */}
-      <div className="border-b border-gray-800 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-border/30 bg-background/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <h1 className="text-xl font-semibold text-white">My Profile</h1>
-            </div>
+            <h1 className="text-xl font-semibold text-white">My Profile</h1>
             {!isEditing ? (
               <Button onClick={startEditing} className="flex items-center gap-2">
                 <Edit2 className="h-4 w-4" />
