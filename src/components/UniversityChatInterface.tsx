@@ -145,17 +145,17 @@ export default function UniversityChatInterface({
 
     if (!university) return;
 
-    // Call Maya API
+    // Call University-scoped Maya API
     try {
-      const response = await fetch('/api/maya/chat', {
+      const response = await fetch(`/api/universities/${university.id}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, newMessage].map((m) => ({
+          message: newMessage.content,
+          history: messages.map((m) => ({
             role: m.role,
             content: m.content,
           })),
-          universityId: university.id,
         }),
       });
 
@@ -427,13 +427,21 @@ export default function UniversityChatInterface({
                               {message.content}
                             </p>
                           ) : (
-                            <div className="text-[15px] leading-relaxed prose prose-invert max-w-none">
+                             <div className="text-[15px] leading-relaxed prose prose-invert max-w-none">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                  p: ({ node, ...props }) => (
-                                    <p className="mb-2 last:mb-0" {...props} />
-                                  ),
+                                  p: ({ node, ...props }) => {
+                                    const content = props.children as string;
+                                    // Remove citations from text to show them as badges instead
+                                    const cleanText = typeof content === 'string' 
+                                      ? content.replace(/📄 Source: [^\n]+/g, '').trim()
+                                      : content;
+                                    
+                                    if (!cleanText) return null;
+                                    
+                                    return <p className="mb-2 last:mb-0" {...props}>{cleanText}</p>;
+                                  },
                                   ul: ({ node, ...props }) => (
                                     <ul
                                       className="list-disc pl-4 mb-2"
@@ -489,6 +497,28 @@ export default function UniversityChatInterface({
                               >
                                 {message.content}
                               </ReactMarkdown>
+
+                              {/* Source Badges */}
+                              {(() => {
+                                const citationRegex = /📄 Source: ([^\n]+)/g;
+                                const citations = Array.from(message.content.matchAll(citationRegex)).map(m => m[1]);
+                                
+                                if (citations.length === 0) return null;
+
+                                return (
+                                  <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-border/20">
+                                    {citations.map((source, i) => (
+                                      <div 
+                                        key={i}
+                                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-[11px] font-medium text-primary cursor-default group hover:bg-primary/20 transition-colors"
+                                      >
+                                        <Star className="h-3 w-3 fill-primary/20 group-hover:fill-primary/40" />
+                                        <span>Source: {source}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
