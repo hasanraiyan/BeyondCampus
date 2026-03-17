@@ -11,11 +11,17 @@ export async function POST(
     const { message, history } = await req.json();
 
     if (!universityId) {
+      console.error(`❌ [API Error] University ID is missing in request.`);
       return new Response(JSON.stringify({ error: 'University ID is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    console.log(`\n======================================================`);
+    console.log(`💬 [API: /api/universities/${universityId}/chat] New Message`);
+    console.log(`🗣️ User: "${message}"`);
+    console.log(`======================================================\n`);
 
     // Map history to LangChain messages
     const mappedMessages = (history || []).map((m: any) =>
@@ -40,6 +46,43 @@ export async function POST(
           for await (const event of eventStream) {
             const eventType = event.event;
 
+            // --- AI Step Logging ---
+            if (eventType === 'on_tool_start') {
+              console.log(`\n🔹 [STEP: Tool Call] AI is calling tool: ${event.name}`);
+              console.log(`📥 Input:`, JSON.stringify(event.data?.input || {}, null, 2));
+            } else if (eventType === 'on_tool_end') {
+              console.log(`\n✅ [STEP: Tool Result] Tool returned from: ${event.name}`);
+              console.log(`📤 Output:`, JSON.stringify(event.data?.output || {}, null, 2));
+            } else if (eventType === 'on_chat_model_start') {
+              console.log(`\n🧠 [STEP: Model Start] AI model is thinking...`);
+            } else if (eventType === 'on_chat_model_end') {
+              console.log(`\n💭 [STEP: Model End] AI model finished generating.`);
+            }
+            // -----------------------
+
+            if (eventType === 'on_tool_end' && event.name === 'list_programs') {
+              // Try to correctly parse the tool result whether it is inside content or kwargs
+              const output = event.data?.output;
+              let toolOutputData = output?.kwargs?.content || output?.content || output;
+              
+              if (typeof toolOutputData === 'string') {
+                try {
+                  toolOutputData = JSON.parse(toolOutputData);
+                } catch (e) {}
+              }
+
+              try {
+                const payload = JSON.stringify({
+                  type: 'tool',
+                  tool: event.name,
+                  data: toolOutputData,
+                }) + '\n';
+                controller.enqueue(encoder.encode(payload));
+              } catch (e) {
+                // ignore
+              }
+            }
+
             // Stream text content from the 'agent' node
             // Note: In the refactored agent, the node name is 'agent'
             if (
@@ -50,7 +93,11 @@ export async function POST(
               if (content) {
                 const text = typeof content === 'string' ? content : JSON.stringify(content);
                 try {
-                  controller.enqueue(encoder.encode(text));
+                  const payload = JSON.stringify({
+                    type: 'text',
+                    content: text,
+                  }) + '\n';
+                  controller.enqueue(encoder.encode(payload));
                 } catch (e) {
                   // Controller might be closed if client disconnected
                   break;

@@ -70,31 +70,34 @@ button:focus {
   outline: none;
 }
 
-/* Scrollbar styling for textarea */
-textarea::-webkit-scrollbar {
-  width: 6px;
+/* Global Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-textarea::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
 
-textarea::-webkit-scrollbar-thumb {
-  background: hsl(var(--border) / 0.3);
-  border-radius: 3px;
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
 }
 
-textarea::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--border) / 0.5);
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* Tailwind scrollbar utilities */
-.scrollbar-thin {
+/* Hide buttons (arrows) */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Firefox */
+* {
   scrollbar-width: thin;
-}
-
-.scrollbar-thumb-border {
-  scrollbar-color: hsl(var(--border) / 0.3) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 /* Dropdown menu overrides */

@@ -14,17 +14,23 @@ import {
   MapPin,
   Users,
   Star,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UniversityDetailSkeleton } from './UniversityDetailSkeleton';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ProgramListUI, Program } from '@/components/ProgramListUI';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  toolData?: {
+    tool: string;
+    data: any;
+  };
 }
 
 interface University {
@@ -173,20 +179,42 @@ export default function UniversityChatInterface({
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let done = false;
-
+        let buffer = '';
         while (!done) {
           const { value, done: doneReading } = await reader.read();
           done = doneReading;
-          const chunkValue = decoder.decode(value, { stream: !done });
-
-          if (chunkValue) {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === aiMessageId
-                  ? { ...m, content: m.content + chunkValue }
-                  : m
-              )
-            );
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done });
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, newlineIndex);
+              buffer = buffer.slice(newlineIndex + 1);
+              if (line.trim()) {
+                try {
+                  const parsed = JSON.parse(line);
+                  if (parsed.type === 'text') {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === aiMessageId
+                          ? { ...m, content: m.content + parsed.content }
+                          : m
+                      )
+                    );
+                  } else if (parsed.type === 'tool' && parsed.tool === 'list_programs') {
+                    // Inject tool UI state
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === aiMessageId
+                          ? { ...m, toolData: { tool: parsed.tool, data: parsed.data } }
+                          : m
+                      )
+                    );
+                  }
+                } catch (e) {
+                  console.error('Failed to parse line:', line, e);
+                }
+              }
+            }
           }
         }
       } else {
@@ -246,22 +274,25 @@ export default function UniversityChatInterface({
               </p>
             </div>
 
-            {/* Apply Button */}
+            {/* New Chat Button */}
             <Button
-              className="bg-primary hover:bg-primary/90 text-white font-medium px-6"
+              variant="outline"
+              className="border-primary/50 text-primary hover:bg-primary/10 font-medium px-6"
               onClick={() => {
-                console.log(`Applying to ${university.name}`);
-                alert(`Opening ${university.name} application portal...`);
+                if (window.confirm('Are you sure you want to start a new chat? This will clear your current conversation.')) {
+                  setMessages([]);
+                }
               }}
             >
-              Apply Now
+              <RefreshCw className="h-4 w-4 mr-2" />
+              New Chat
             </Button>
           </div>
         </div>
 
         {/* University Stats Banner */}
         <div className="bg-secondary/30 border-b border-border/30 px-6 py-4">
-          <div className="flex items-center justify-center gap-8 text-sm">
+          <div className="flex items-center justify-center gap-16 text-sm">
             <div className="text-center">
               <p className="font-semibold text-foreground">Admission Rate</p>
               <p className="text-muted-foreground">
@@ -283,18 +314,18 @@ export default function UniversityChatInterface({
         {messages.length === 0 ? (
           /* Welcome State */
           <div className="flex-1 flex flex-col items-center justify-center px-8">
-            <div className="max-w-2xl w-full text-center -mt-20">
+            <div className="max-w-4xl w-full text-center -mt-20">
               {/* Counselor Avatar */}
-              <div className="mb-6">
-                <Avatar className="h-20 w-20 mx-auto mb-4">
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
+              <div className="mb-8">
+                <Avatar className="h-24 w-24 mx-auto mb-6">
+                  <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
                     {university.counselorName
                       .split(' ')
                       .map((n) => n[0])
                       .join('')}
                   </AvatarFallback>
                 </Avatar>
-                <h2 className="text-3xl font-bold text-foreground">
+                <h2 className="text-4xl font-bold text-foreground">
                   {displayedText}
                 </h2>
               </div>
@@ -364,7 +395,7 @@ export default function UniversityChatInterface({
           /* Chat Messages */
           <>
             <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-              <div className="max-w-3xl mx-auto space-y-4">
+              <div className="max-w-6xl mx-auto space-y-4 w-full px-4">
                 {messages.map((message, index) => {
                   const prevMessage = index > 0 ? messages[index - 1] : null;
                   const showHeader =
@@ -394,7 +425,7 @@ export default function UniversityChatInterface({
                       )}
                       <div
                         className={cn(
-                          'flex flex-col gap-2 max-w-[80%]',
+                          'flex flex-col gap-2 max-w-[95%] w-full',
                           message.role === 'user' && 'items-end'
                         )}
                       >
@@ -427,7 +458,13 @@ export default function UniversityChatInterface({
                               {message.content}
                             </p>
                           ) : (
-                             <div className="text-[15px] leading-relaxed prose prose-invert max-w-none">
+                             <div className="text-[15px] leading-relaxed prose prose-invert max-w-none w-full">
+                              {/* Render Generative UI Tool result if present */}
+                              {message.toolData && message.toolData.tool === 'list_programs' && (
+                                 <div className="mb-4">
+                                   <ProgramListUI programs={message.toolData.data as Program[]} />
+                                 </div>
+                              )}
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
@@ -521,6 +558,7 @@ export default function UniversityChatInterface({
                               })()}
                             </div>
                           )}
+
                         </div>
 
                         <span className="text-[11px] text-muted-foreground opacity-60">
@@ -544,8 +582,8 @@ export default function UniversityChatInterface({
             </ScrollArea>
 
             {/* Input Area */}
-            <div className="p-6 bg-background">
-              <div className="max-w-3xl mx-auto">
+            <div className="p-6 bg-background border-t border-border/20">
+              <div className="max-w-6xl mx-auto w-full px-4">
                 <div className="relative">
                   <Textarea
                     ref={textareaRef}
