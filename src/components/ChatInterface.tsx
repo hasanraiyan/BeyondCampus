@@ -445,7 +445,10 @@ export default function ChatInterface() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: chatMessages,
+          // Only send the new message if thread history is persisted
+          // LangGraph appends to the history based on thread_id
+          messages: [userMessage].map(m => ({ role: m.role, content: m.content })),
+          threadId: currentChatId,
         }),
       });
 

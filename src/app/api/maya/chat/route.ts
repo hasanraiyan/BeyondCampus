@@ -1,14 +1,17 @@
 import { NextRequest } from 'next/server';
 import { mayaAgent } from '@/lib/maya/agent';
+import { setupCheckpointer } from '@/lib/maya/checkpoint';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, universityId } = await req.json();
+    const { messages, universityId, threadId } = await req.json();
 
     const mappedMessages = messages.map((m: any) =>
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
     );
+
+    await setupCheckpointer();
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -19,7 +22,10 @@ export async function POST(req: NextRequest) {
               messages: mappedMessages,
               universityId: universityId || null,
             },
-            { version: 'v2' }
+            {
+              version: 'v2',
+              configurable: { thread_id: threadId || 'default-thread' }
+            }
           );
 
           for await (const event of eventStream) {

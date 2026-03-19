@@ -3,6 +3,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { globalToolbox } from './globalTools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { checkpointer } from './checkpoint';
 
 // Define the state for the global agent
 const GlobalMayaState = Annotation.Root({
@@ -69,4 +70,4 @@ const workflow = new StateGraph(GlobalMayaState)
   .addEdge('tools', 'agent');
 
 // Compile the agent
-export const globalAgent = workflow.compile();
+export const globalAgent = workflow.compile({ checkpointer });

@@ -4,6 +4,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
 import { toolbox } from './universityTools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
+import { checkpointer } from './checkpoint';
 
 // Define the state for the agent
 const MayaState = Annotation.Root({
@@ -92,7 +93,7 @@ const workflow = new StateGraph(MayaState)
   .addEdge('tools', 'agent');
 
 // Compile the agent
-export const universityAgent = workflow.compile();
+export const universityAgent = workflow.compile({ checkpointer });
 
 // For backward compatibility and specialized use
 export const mayaAgent = universityAgent;
