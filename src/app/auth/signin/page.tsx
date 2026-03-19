@@ -15,6 +15,26 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Check if setup is needed
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/system/status');
+        const data = await res.json();
+        if (data.needsSetup) {
+          router.push('/admin/setup');
+        } else {
+          setIsChecking(false);
+        }
+      } catch (err) {
+        console.error('Failed to check system status:', err);
+        setIsChecking(false);
+      }
+    };
+    checkStatus();
+  }, [router]);
 
   // Force dark theme for this page
   useEffect(() => {
@@ -60,6 +80,24 @@ export default function SignIn() {
       setIsLoading(false);
     }
   };
+
+  if (isChecking) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          backgroundColor: '#0d1117',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ffffff',
+          fontFamily: 'sans-serif',
+        }}
+      >
+        Checking system status...
+      </div>
+    );
+  }
 
   return (
     <div

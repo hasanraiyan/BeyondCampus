@@ -12,6 +12,9 @@ export async function middleware(request: NextRequest) {
     '/auth/signup',
     '/api/auth',
     '/api/user/onboarding',
+    '/api/system/status',
+    '/admin/setup',
+    '/api/admin/setup',
   ];
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
 
@@ -24,7 +27,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // Admin protection
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+  if ((pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) &&
+      !pathname.startsWith('/admin/setup') &&
+      !pathname.startsWith('/api/admin/setup')) {
     if (!token || (token as any).role !== 'ADMIN') {
       // Redirect UI requests, return error for API requests
       if (pathname.startsWith('/api/')) {
