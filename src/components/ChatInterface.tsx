@@ -114,7 +114,7 @@ export default function ChatInterface() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const currentChat = chats.find((chat) => chat.id === currentChatId);
+  const currentChat = currentChatId ? chats.find((chat) => chat.id === currentChatId) : null;
 
   // Sample data for mentors, universities and success stories
   const mentors: Mentor[] = [
@@ -274,6 +274,67 @@ export default function ChatInterface() {
     selectedCategory === 'all'
       ? mentors
       : mentors.filter((m) => m.category === selectedCategory);
+
+  // Fetch threads
+  useEffect(() => {
+    const fetchThreads = async () => {
+      try {
+        const response = await fetch('/api/threads?context=global');
+        if (response.ok) {
+          const data = await response.json();
+          const mappedChats = data.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            messages: [],
+            createdAt: new Date(t.createdAt),
+          }));
+          setChats(mappedChats);
+          if (mappedChats.length > 0 && !currentChatId) {
+            setCurrentChatId(mappedChats[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching threads:', error);
+      }
+    };
+
+    if (session) {
+      fetchThreads();
+    }
+  }, [session]);
+
+  // Fetch messages when thread changes
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!currentChatId) return;
+      try {
+        const response = await fetch(`/api/threads/${currentChatId}/messages`);
+        if (response.ok) {
+          const data = await response.json();
+          setChats((prev) => prev.map(chat => {
+            if (chat.id === currentChatId) {
+              return {
+                ...chat,
+                messages: data.messages.map((m: any) => ({
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  timestamp: new Date(m.timestamp)
+                }))
+              };
+            }
+            return chat;
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
+
+    if (currentChatId) {
+      fetchMessages();
+    }
+  }, [currentChatId]);
 
   // Fetch user profile data
   useEffect(() => {
@@ -507,15 +568,30 @@ export default function ChatInterface() {
     }
   };
 
-  const createNewChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: `New Chat ${chats.length + 1}`,
-      messages: [],
-      createdAt: new Date(),
-    };
-    setChats([...chats, newChat]);
-    setCurrentChatId(newChat.id);
+  const createNewChat = async () => {
+    try {
+      const response = await fetch('/api/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `New Chat ${chats.length + 1}`,
+          context: 'global'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const newChat: Chat = {
+          id: data.id,
+          title: data.title,
+          messages: [],
+          createdAt: new Date(data.createdAt),
+        };
+        setChats([newChat, ...chats]);
+        setCurrentChatId(newChat.id);
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
   };
 
   return (
