@@ -386,13 +386,16 @@ export default function ChatInterface() {
     }
   }, [currentChat?.messages]);
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim() || !currentChat) return;
+  const [isLoading, setIsLoading] = useState(false);
 
-    const newMessage: Message = {
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !currentChat || isLoading) return;
+
+    const userMsgContent = inputMessage.trim().replace(/\s+/g, ' ');
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputMessage.trim().replace(/\s+/g, ' '),
+      content: userMsgContent,
       timestamp: new Date(),
     };
 
@@ -400,7 +403,7 @@ export default function ChatInterface() {
       if (chat.id === currentChatId) {
         return {
           ...chat,
-          messages: [...chat.messages, newMessage],
+          messages: [...chat.messages, userMessage],
         };
       }
       return chat;
@@ -408,29 +411,97 @@ export default function ChatInterface() {
 
     setChats(updatedChats);
     setInputMessage('');
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content:
-          "I'm here to help you explore career paths and provide guidance. What specific aspect of your career would you like to discuss?",
-        timestamp: new Date(),
-      };
+    const tempAiMessageId = (Date.now() + 1).toString();
+    const aiMessage: Message = {
+      id: tempAiMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
 
+    setChats((prevChats) =>
+      prevChats.map((chat) => {
+        if (chat.id === currentChatId) {
+          return {
+            ...chat,
+            messages: [...chat.messages, aiMessage],
+          };
+        }
+        return chat;
+      })
+    );
+
+    try {
+      const chatMessages = currentChat.messages.concat(userMessage).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const res = await fetch('/api/maya/global-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: chatMessages,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      if (!res.body) {
+        throw new Error('ReadableStream not yet supported in this browser.');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+      let streamedContent = '';
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value, { stream: true });
+        streamedContent += chunkValue;
+
+        setChats((prevChats) =>
+          prevChats.map((chat) => {
+            if (chat.id === currentChatId) {
+              const updatedMessages = chat.messages.map((m) => {
+                if (m.id === tempAiMessageId) {
+                  return { ...m, content: streamedContent };
+                }
+                return m;
+              });
+              return { ...chat, messages: updatedMessages };
+            }
+            return chat;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching AI response:', error);
       setChats((prevChats) =>
         prevChats.map((chat) => {
           if (chat.id === currentChatId) {
-            return {
-              ...chat,
-              messages: [...chat.messages, aiResponse],
-            };
+            const updatedMessages = chat.messages.map((m) => {
+              if (m.id === tempAiMessageId) {
+                return { ...m, content: 'Sorry, I encountered an error processing your request.' };
+              }
+              return m;
+            });
+            return { ...chat, messages: updatedMessages };
           }
           return chat;
         })
       );
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const createNewChat = () => {

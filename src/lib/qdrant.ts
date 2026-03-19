@@ -247,3 +247,52 @@ export async function searchKnowledge(
     throw error;
   }
 }
+
+/**
+ * Searches Qdrant for programs semantically matching the query across ALL collections (universities).
+ */
+export async function searchAllPrograms(
+  query: string,
+  topK: number = 20
+) {
+  try {
+    // 1. Get all collections
+    const collectionsResponse = await qdrantClient.getCollections();
+    const collections = collectionsResponse.collections.map(c => c.name);
+
+    if (collections.length === 0) return [];
+
+    // 2. Embed the query
+    const queryVector = await embeddings.embedQuery(query);
+
+    // 3. Search each collection in parallel
+    const searchPromises = collections.map(async (collectionName) => {
+      try {
+        const results = await qdrantClient.search(collectionName, {
+          vector: queryVector,
+          limit: topK,
+          with_payload: true,
+          filter: {
+            must: [{ key: 'type', match: { value: 'program' } }],
+          },
+        });
+        return results;
+      } catch (err: any) {
+        if (err?.status === 404) return [];
+        console.error(`Error searching programs in ${collectionName}:`, err);
+        return [];
+      }
+    });
+
+    const allResultsArrays = await Promise.all(searchPromises);
+
+    // 4. Flatten, sort by score descending, and take topK
+    const flatResults = allResultsArrays.flat();
+    flatResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+    return flatResults.slice(0, topK);
+  } catch (error: any) {
+    console.error('Error searching all programs in Qdrant:', error);
+    throw error;
+  }
+}
