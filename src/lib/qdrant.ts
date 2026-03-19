@@ -126,43 +126,23 @@ export async function deleteProgramVector(
   universityId: string,
   programId: string
 ) {
-  // Delete from both old and new collections to prevent orphaned data during transition
-  const oldCollectionName = `university_${universityId}`;
-
   try {
-    const oldExists = await qdrantClient.collectionExists(oldCollectionName);
-    if (oldExists.exists) {
-      await qdrantClient.delete(oldCollectionName, {
-        wait: true,
-        filter: {
-          must: [
-            { key: 'type', match: { value: 'program' } },
-            { key: 'programId', match: { value: programId } },
-          ],
-        },
-      });
-      console.log(`[Qdrant] Deleted vectors for program ${programId} from ${oldCollectionName}`);
-    }
-  } catch (err) {
-    console.error(`[Qdrant] Failed to delete vectors for program ${programId} from ${oldCollectionName} (non-fatal):`, err);
-  }
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
+    if (!exists.exists) return; // nothing to delete
 
-  try {
-    const newExists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
-    if (newExists.exists) {
-      await qdrantClient.delete(PROGRAMS_COLLECTION, {
-        wait: true,
-        filter: {
-          must: [
-            { key: 'type', match: { value: 'program' } },
-            { key: 'programId', match: { value: programId } },
-          ],
-        },
-      });
-      console.log(`[Qdrant] Deleted vectors for program ${programId} from ${PROGRAMS_COLLECTION}`);
-    }
+    await qdrantClient.delete(PROGRAMS_COLLECTION, {
+      wait: true,
+      filter: {
+        must: [
+          { key: 'type', match: { value: 'program' } },
+          { key: 'programId', match: { value: programId } },
+        ],
+      },
+    });
+
+    console.log(`[Qdrant] Deleted vectors for program ${programId} from ${PROGRAMS_COLLECTION}`);
   } catch (err) {
-    console.error(`[Qdrant] Failed to delete vectors for program ${programId} from ${PROGRAMS_COLLECTION} (non-fatal):`, err);
+    console.error(`[Qdrant] Failed to delete vectors for program ${programId} (non-fatal):`, err);
   }
 }
 
@@ -178,8 +158,6 @@ export async function embedPrograms(
 ) {
   if (!programs || programs.length === 0) return;
 
-  const oldCollectionName = `university_${universityId}`;
-  await ensureCollection(universityId);
   await ensureProgramsCollection();
 
   const points = [];
@@ -218,10 +196,6 @@ export async function embedPrograms(
   }
 
   if (points.length > 0) {
-    // Upsert to both old and new collections for backward compatibility during rollout
-    await qdrantClient.upsert(oldCollectionName, { wait: true, points });
-    console.log(`Upserted ${points.length} program vectors to ${oldCollectionName}`);
-
     await qdrantClient.upsert(PROGRAMS_COLLECTION, { wait: true, points });
     console.log(`Upserted ${points.length} program vectors to ${PROGRAMS_COLLECTION}`);
   }
@@ -236,57 +210,29 @@ export async function searchPrograms(
   query: string,
   topK: number = 8
 ) {
-  const useSharedCollection = process.env.USE_SHARED_PROGRAMS_COLLECTION === 'true';
+  try {
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
+    if (!exists.exists) return [];
 
-  if (useSharedCollection) {
-    try {
-      const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
-      if (!exists.exists) return [];
+    const queryVector = await embeddings.embedQuery(query);
 
-      const queryVector = await embeddings.embedQuery(query);
+    const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
+      vector: queryVector,
+      limit: topK,
+      with_payload: true,
+      filter: {
+        must: [
+          { key: 'type', match: { value: 'program' } },
+          { key: 'universityId', match: { value: universityId } }
+        ],
+      },
+    });
 
-      const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
-        vector: queryVector,
-        limit: topK,
-        with_payload: true,
-        filter: {
-          must: [
-            { key: 'type', match: { value: 'program' } },
-            { key: 'universityId', match: { value: universityId } }
-          ],
-        },
-      });
-
-      return searchResults;
-    } catch (error: any) {
-      if (error?.status === 404) return [];
-      console.error(`Error searching programs in ${PROGRAMS_COLLECTION}:`, error);
-      throw error;
-    }
-  } else {
-    // Fallback to old behavior
-    const oldCollectionName = `university_${universityId}`;
-    try {
-      const exists = await qdrantClient.collectionExists(oldCollectionName);
-      if (!exists.exists) return [];
-
-      const queryVector = await embeddings.embedQuery(query);
-
-      const searchResults = await qdrantClient.search(oldCollectionName, {
-        vector: queryVector,
-        limit: topK,
-        with_payload: true,
-        filter: {
-          must: [{ key: 'type', match: { value: 'program' } }],
-        },
-      });
-
-      return searchResults;
-    } catch (error: any) {
-      if (error?.status === 404) return [];
-      console.error(`Error searching programs in ${oldCollectionName}:`, error);
-      throw error;
-    }
+    return searchResults;
+  } catch (error: any) {
+    if (error?.status === 404) return [];
+    console.error(`Error searching programs in ${PROGRAMS_COLLECTION}:`, error);
+    throw error;
   }
 }
 
@@ -331,59 +277,22 @@ export async function searchAllPrograms(
   query: string,
   topK: number = 20
 ) {
-  const useSharedCollection = process.env.USE_SHARED_PROGRAMS_COLLECTION === 'true';
-
   try {
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
+    if (!exists.exists) return [];
+
     const queryVector = await embeddings.embedQuery(query);
 
-    if (useSharedCollection) {
-      const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
-      if (!exists.exists) return [];
+    const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
+      vector: queryVector,
+      limit: topK,
+      with_payload: true,
+      filter: {
+        must: [{ key: 'type', match: { value: 'program' } }],
+      },
+    });
 
-      const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
-        vector: queryVector,
-        limit: topK,
-        with_payload: true,
-        filter: {
-          must: [{ key: 'type', match: { value: 'program' } }],
-        },
-      });
-
-      return searchResults;
-    } else {
-      // 1. Get all collections
-      const collectionsResponse = await qdrantClient.getCollections();
-      const collections = collectionsResponse.collections.map(c => c.name);
-
-      if (collections.length === 0) return [];
-
-      // 3. Search each collection in parallel
-      const searchPromises = collections.map(async (collectionName) => {
-        try {
-          const results = await qdrantClient.search(collectionName, {
-            vector: queryVector,
-            limit: topK,
-            with_payload: true,
-            filter: {
-              must: [{ key: 'type', match: { value: 'program' } }],
-            },
-          });
-          return results;
-        } catch (err: any) {
-          if (err?.status === 404) return [];
-          console.error(`Error searching programs in ${collectionName}:`, err);
-          return [];
-        }
-      });
-
-      const allResultsArrays = await Promise.all(searchPromises);
-
-      // 4. Flatten, sort by score descending, and take topK
-      const flatResults = allResultsArrays.flat();
-      flatResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
-      return flatResults.slice(0, topK);
-    }
+    return searchResults;
   } catch (error: any) {
     if (error?.status === 404) return [];
     console.error('Error searching all programs in Qdrant:', error);
