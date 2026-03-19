@@ -16,6 +16,7 @@
     "@langchain/core": "^1.1.32",
     "@langchain/google-genai": "^2.1.25",
     "@langchain/langgraph": "^1.2.2",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@langchain/openai": "^1.2.13",
     "@langchain/qdrant": "^1.0.1",
     "@langchain/textsplitters": "^1.0.1",
@@ -41,6 +42,7 @@
     "lucide-react": "^0.525.0",
     "next": "^15.5.2",
     "next-auth": "^4.24.11",
+    "pg": "^8.20.0",
     "prisma": "^6.12.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -54,6 +56,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
+    "@types/pg": "^8.18.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",

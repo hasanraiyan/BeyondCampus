@@ -151,6 +151,7 @@ model User {
   documents     Document[]
   shortlists    Shortlist[]
   applications  Application[]
+  chatThreads   ChatThread[]
 }
 
 model Session {
@@ -268,6 +269,7 @@ model University {
   applications  Application[]
   knowledgeDocs UniversityKnowledgeDoc[]
   scholarships  Scholarship[]
+  chatThreads    ChatThread[]
 
   @@index([state])
 }
@@ -379,3 +381,19 @@ model Scholarship {
   @@index([universityId])
 }
 
+
+model ChatThread {
+  id           String   @id @default(uuid())
+  userId       String
+  title        String
+  context      String?  // e.g. "global", "university"
+  universityId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([universityId])
+}

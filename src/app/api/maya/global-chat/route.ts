@@ -1,26 +1,27 @@
 import { NextRequest } from 'next/server';
-import { mayaAgent } from '@/lib/maya/agent';
+import { globalAgent } from '@/lib/maya/globalAgent';
 import { setupCheckpointer } from '@/lib/maya/checkpoint';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, universityId, threadId } = await req.json();
+    // Extract threadId if passed
+    const { messages, threadId } = await req.json();
 
     const mappedMessages = messages.map((m: any) =>
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
     );
 
+    // Initialize the DB checkpointer tables
     await setupCheckpointer();
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const eventStream = await mayaAgent.streamEvents(
+          const eventStream = await globalAgent.streamEvents(
             {
               messages: mappedMessages,
-              universityId: universityId || null,
             },
             {
               version: 'v2',
@@ -31,10 +32,10 @@ export async function POST(req: NextRequest) {
           for await (const event of eventStream) {
             const eventType = event.event;
 
-            // Check for chat model stream events from the 'generate' node
+            // Check for chat model stream events from the 'agent' node
             if (
               eventType === 'on_chat_model_stream' &&
-              event.metadata?.langgraph_node === 'generate'
+              event.metadata?.langgraph_node === 'agent'
             ) {
               const content = event.data?.chunk?.content;
               if (content) {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Maya Agent Error:', error);
+    console.error('Global Maya Agent Error:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to process message' }),
       {

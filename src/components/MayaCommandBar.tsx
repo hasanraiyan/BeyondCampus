@@ -121,6 +121,7 @@ export default function MayaCommandBar({
         body: JSON.stringify({
           messages: [{ role: 'user', content: question }],
           context: context,
+          threadId: 'maya-command-bar-' + (typeof window !== 'undefined' ? window.sessionStorage.getItem('mayaThreadId') || (() => { const id = Date.now().toString(); window.sessionStorage.setItem('mayaThreadId', id); return id; })() : 'default'),
         }),
       });
 

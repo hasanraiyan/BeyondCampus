@@ -114,7 +114,7 @@ export default function ChatInterface() {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const currentChat = chats.find((chat) => chat.id === currentChatId);
+  const currentChat = currentChatId ? chats.find((chat) => chat.id === currentChatId) : null;
 
   // Sample data for mentors, universities and success stories
   const mentors: Mentor[] = [
@@ -275,6 +275,67 @@ export default function ChatInterface() {
       ? mentors
       : mentors.filter((m) => m.category === selectedCategory);
 
+  // Fetch threads
+  useEffect(() => {
+    const fetchThreads = async () => {
+      try {
+        const response = await fetch('/api/threads?context=global');
+        if (response.ok) {
+          const data = await response.json();
+          const mappedChats = data.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            messages: [],
+            createdAt: new Date(t.createdAt),
+          }));
+          setChats(mappedChats);
+          if (mappedChats.length > 0 && !currentChatId) {
+            setCurrentChatId(mappedChats[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching threads:', error);
+      }
+    };
+
+    if (session) {
+      fetchThreads();
+    }
+  }, [session]);
+
+  // Fetch messages when thread changes
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!currentChatId) return;
+      try {
+        const response = await fetch(`/api/threads/${currentChatId}/messages`);
+        if (response.ok) {
+          const data = await response.json();
+          setChats((prev) => prev.map(chat => {
+            if (chat.id === currentChatId) {
+              return {
+                ...chat,
+                messages: data.messages.map((m: any) => ({
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  timestamp: new Date(m.timestamp)
+                }))
+              };
+            }
+            return chat;
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
+
+    if (currentChatId) {
+      fetchMessages();
+    }
+  }, [currentChatId]);
+
   // Fetch user profile data
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -386,13 +447,16 @@ export default function ChatInterface() {
     }
   }, [currentChat?.messages]);
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim() || !currentChat) return;
+  const [isLoading, setIsLoading] = useState(false);
 
-    const newMessage: Message = {
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !currentChat || isLoading) return;
+
+    const userMsgContent = inputMessage.trim().replace(/\s+/g, ' ');
+    const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputMessage.trim().replace(/\s+/g, ' '),
+      content: userMsgContent,
       timestamp: new Date(),
     };
 
@@ -400,7 +464,7 @@ export default function ChatInterface() {
       if (chat.id === currentChatId) {
         return {
           ...chat,
-          messages: [...chat.messages, newMessage],
+          messages: [...chat.messages, userMessage],
         };
       }
       return chat;
@@ -408,40 +472,126 @@ export default function ChatInterface() {
 
     setChats(updatedChats);
     setInputMessage('');
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content:
-          "I'm here to help you explore career paths and provide guidance. What specific aspect of your career would you like to discuss?",
-        timestamp: new Date(),
-      };
+    const tempAiMessageId = (Date.now() + 1).toString();
+    const aiMessage: Message = {
+      id: tempAiMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
 
+    setChats((prevChats) =>
+      prevChats.map((chat) => {
+        if (chat.id === currentChatId) {
+          return {
+            ...chat,
+            messages: [...chat.messages, aiMessage],
+          };
+        }
+        return chat;
+      })
+    );
+
+    try {
+      const chatMessages = currentChat.messages.concat(userMessage).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      const res = await fetch('/api/maya/global-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Only send the new message if thread history is persisted
+          // LangGraph appends to the history based on thread_id
+          messages: [userMessage].map(m => ({ role: m.role, content: m.content })),
+          threadId: currentChatId,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      if (!res.body) {
+        throw new Error('ReadableStream not yet supported in this browser.');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let done = false;
+      let streamedContent = '';
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value, { stream: true });
+        streamedContent += chunkValue;
+
+        setChats((prevChats) =>
+          prevChats.map((chat) => {
+            if (chat.id === currentChatId) {
+              const updatedMessages = chat.messages.map((m) => {
+                if (m.id === tempAiMessageId) {
+                  return { ...m, content: streamedContent };
+                }
+                return m;
+              });
+              return { ...chat, messages: updatedMessages };
+            }
+            return chat;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching AI response:', error);
       setChats((prevChats) =>
         prevChats.map((chat) => {
           if (chat.id === currentChatId) {
-            return {
-              ...chat,
-              messages: [...chat.messages, aiResponse],
-            };
+            const updatedMessages = chat.messages.map((m) => {
+              if (m.id === tempAiMessageId) {
+                return { ...m, content: 'Sorry, I encountered an error processing your request.' };
+              }
+              return m;
+            });
+            return { ...chat, messages: updatedMessages };
           }
           return chat;
         })
       );
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const createNewChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: `New Chat ${chats.length + 1}`,
-      messages: [],
-      createdAt: new Date(),
-    };
-    setChats([...chats, newChat]);
-    setCurrentChatId(newChat.id);
+  const createNewChat = async () => {
+    try {
+      const response = await fetch('/api/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `New Chat ${chats.length + 1}`,
+          context: 'global'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const newChat: Chat = {
+          id: data.id,
+          title: data.title,
+          messages: [],
+          createdAt: new Date(data.createdAt),
+        };
+        setChats([newChat, ...chats]);
+        setCurrentChatId(newChat.id);
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
   };
 
   return (
