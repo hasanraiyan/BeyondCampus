@@ -41,7 +41,6 @@ export async function POST(
               universityId: universityId,
             },
             { 
-              version: 'v2',
               configurable: { universityId: universityId }
             }
           );

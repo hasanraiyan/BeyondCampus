@@ -18,8 +18,7 @@ export async function POST(req: NextRequest) {
             {
               messages: mappedMessages,
               universityId: universityId || null,
-            },
-            { version: 'v2' }
+            }
           );
 
           for await (const event of eventStream) {
@@ -28,7 +27,7 @@ export async function POST(req: NextRequest) {
             // Check for chat model stream events from the 'generate' node
             if (
               eventType === 'on_chat_model_stream' &&
-              event.metadata?.langgraph_node === 'generate'
+              event.metadata?.langgraph_node === 'agent'
             ) {
               const content = event.data?.chunk?.content;
               if (content) {
