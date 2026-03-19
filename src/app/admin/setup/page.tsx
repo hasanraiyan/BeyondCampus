@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GraduationCap, Eye, EyeOff } from 'lucide-react';
 
-export default function SignUp() {
+export default function AdminSetup() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -24,8 +24,8 @@ export default function SignUp() {
       try {
         const res = await fetch('/api/system/status');
         const data = await res.json();
-        if (data.needsSetup) {
-          router.push('/admin/setup');
+        if (!data.needsSetup) {
+          router.push('/auth/signin');
         } else {
           setIsChecking(false);
         }
@@ -56,7 +56,7 @@ export default function SignUp() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,12 +68,12 @@ export default function SignUp() {
 
       if (response.ok) {
         // Show success message and redirect to signin
-        await router.push('/auth/signin');
+        router.push('/auth/signin');
       } else {
-        setError(data.message || 'Failed to create account');
+        setError(data.message || 'Failed to create admin account');
       }
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('Setup error:', error);
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -150,33 +150,24 @@ export default function SignUp() {
                 'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
             }}
           >
-            Create your account
+            Setup Admin Account
           </h1>
           <p
             style={{
               fontSize: '16px',
-              color: '#ffffff',
+              color: '#a1a1aa',
               fontFamily:
                 'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
             }}
           >
-            Welcome to BeyondCampus
+            Create the first user for the system
           </p>
         </div>
 
         {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
-        >
-          {/* Name Fields */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
-            }}
-          >
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Name Fields Row */}
+          <div style={{ display: 'flex', gap: '16px' }}>
             <div>
               <label
                 htmlFor="firstName"
@@ -216,13 +207,8 @@ export default function SignUp() {
                     'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
             </div>
             <div>
@@ -264,13 +250,8 @@ export default function SignUp() {
                     'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
             </div>
           </div>
@@ -315,13 +296,8 @@ export default function SignUp() {
                   'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                 boxSizing: 'border-box',
               }}
-              placeholder=""
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-              }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-              }
+              onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+              onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
             />
           </div>
 
@@ -366,14 +342,9 @@ export default function SignUp() {
                     'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
                 minLength={6}
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
               <button
                 type="button"
@@ -437,47 +408,15 @@ export default function SignUp() {
               marginTop: '20px',
             }}
             onMouseEnter={(e) => {
-              if (!isLoading)
-                e.currentTarget.style.backgroundColor = 'hsl(27 96% 55%)';
+              if (!isLoading) e.currentTarget.style.backgroundColor = 'hsl(27 96% 55%)';
             }}
             onMouseLeave={(e) => {
-              if (!isLoading)
-                e.currentTarget.style.backgroundColor = 'hsl(27 96% 61%)';
+              if (!isLoading) e.currentTarget.style.backgroundColor = 'hsl(27 96% 61%)';
             }}
           >
-            {isLoading ? 'Creating account...' : 'Create account'}
+            {isLoading ? 'Creating account...' : 'Create Admin Account'}
           </button>
         </form>
-
-        {/* Sign In Link */}
-        <div style={{ textAlign: 'center', marginTop: '24px' }}>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#ffffff',
-              fontFamily:
-                'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
-            }}
-          >
-            Already have an account?{' '}
-            <Link
-              href="/auth/signin"
-              style={{
-                color: '#ffffff',
-                textDecoration: 'none',
-                fontWeight: '500',
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.textDecoration = 'underline')
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.textDecoration = 'none')
-              }
-            >
-              Log in
-            </Link>
-          </p>
-        </div>
       </div>
     </div>
   );

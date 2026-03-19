@@ -10,6 +10,22 @@ export default function Home() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
+    // Check if system setup is needed first
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/system/status');
+        const data = await res.json();
+        if (data.needsSetup) {
+          router.push('/admin/setup');
+        }
+      } catch (err) {
+        console.error('Failed to check system status:', err);
+      }
+    };
+    checkStatus();
+  }, [router]);
+
+  useEffect(() => {
     if (status === 'loading') return;
 
     if (!session) {
