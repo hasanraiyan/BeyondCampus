@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
-export default function SignUp() {
+export default function AdminSetup() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -14,34 +13,41 @@ export default function SignUp() {
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Force dark theme and check setup status
+  // Security Check: Verify if setup is actually needed
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/system/status');
+        const data = await res.json();
+        if (!data.needsSetup) {
+          router.push('/auth/signin');
+        } else {
+          setIsVerifying(false);
+        }
+      } catch (err) {
+        console.error('Status check failed:', err);
+        setIsVerifying(false);
+      }
+    }
+    checkStatus();
+  }, [router]);
+
+  // Force dark theme for this page
   useEffect(() => {
     document.documentElement.classList.add('dark');
     document.body.style.backgroundColor = 'hsl(0 0% 3%)';
     document.body.style.color = 'hsl(0 0% 95%)';
-
-    async function checkSetup() {
-      try {
-        const res = await fetch('/api/system/status');
-        const data = await res.json();
-        if (data.needsSetup) {
-          router.push('/admin/setup');
-        }
-      } catch (err) {
-        console.error('Setup check failed:', err);
-      }
-    }
-    checkSetup();
 
     return () => {
       document.documentElement.classList.remove('dark');
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
     };
-  }, [router]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +55,7 @@ export default function SignUp() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,18 +66,26 @@ export default function SignUp() {
       const data = await response.json();
 
       if (response.ok) {
-        // Show success message and redirect to signin
-        await router.push('/auth/signin');
+        // Redirect to signin after success
+        router.push('/auth/signin?setup=success');
       } else {
-        setError(data.message || 'Failed to create account');
+        setError(data.message || 'Failed to complete setup');
       }
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('Setup error:', error);
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-orange-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -101,17 +115,17 @@ export default function SignUp() {
           <div className="flex items-center justify-center mb-6">
             <div
               style={{
-                width: '32px',
-                height: '32px',
+                width: '40px',
+                height: '40px',
                 backgroundColor: 'hsl(27 96% 61%)',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <GraduationCap
-                style={{ width: '20px', height: '20px', color: 'black' }}
+              <ShieldCheck
+                style={{ width: '24px', height: '24px', color: 'black' }}
               />
             </div>
           </div>
@@ -125,18 +139,37 @@ export default function SignUp() {
                 'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
             }}
           >
-            Create your account
+            Admin Setup
           </h1>
           <p
             style={{
               fontSize: '16px',
-              color: '#ffffff',
+              color: '#94a3b8',
               fontFamily:
                 'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
             }}
           >
-            Welcome to BeyondCampus
+            Create the primary administrator account
           </p>
+        </div>
+
+        {/* Warning Badge */}
+        <div 
+          style={{
+            marginBottom: '24px',
+            padding: '12px',
+            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+            border: '1px solid rgba(249, 115, 22, 0.2)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+        >
+          <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+          <span style={{ fontSize: '13px', color: '#f97316', fontWeight: '500' }}>
+            Initial system configuration required
+          </span>
         </div>
 
         {/* Form */}
@@ -161,8 +194,6 @@ export default function SignUp() {
                   fontWeight: '600',
                   color: '#ffffff',
                   marginBottom: '6px',
-                  fontFamily:
-                    'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                 }}
               >
                 First name
@@ -184,20 +215,11 @@ export default function SignUp() {
                   borderRadius: '6px',
                   backgroundColor: 'hsl(0 0% 11%)',
                   color: '#ffffff',
-                  fontFamily:
-                    'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                   outline: 'none',
-                  transition:
-                    'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
             </div>
             <div>
@@ -209,8 +231,6 @@ export default function SignUp() {
                   fontWeight: '600',
                   color: '#ffffff',
                   marginBottom: '6px',
-                  fontFamily:
-                    'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                 }}
               >
                 Last name
@@ -232,20 +252,11 @@ export default function SignUp() {
                   borderRadius: '6px',
                   backgroundColor: 'hsl(0 0% 11%)',
                   color: '#ffffff',
-                  fontFamily:
-                    'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                   outline: 'none',
-                  transition:
-                    'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
             </div>
           </div>
@@ -260,11 +271,9 @@ export default function SignUp() {
                 fontWeight: '500',
                 color: '#ffffff',
                 marginBottom: '6px',
-                fontFamily:
-                  'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
               }}
             >
-              Email address
+              Admin Email
             </label>
             <input
               id="email"
@@ -283,20 +292,11 @@ export default function SignUp() {
                 borderRadius: '6px',
                 backgroundColor: 'hsl(0 0% 11%)',
                 color: '#ffffff',
-                fontFamily:
-                  'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                 outline: 'none',
-                transition:
-                  'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                 boxSizing: 'border-box',
               }}
-              placeholder=""
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-              }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-              }
+              onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+              onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
             />
           </div>
 
@@ -310,11 +310,9 @@ export default function SignUp() {
                 fontWeight: '500',
                 color: '#ffffff',
                 marginBottom: '6px',
-                fontFamily:
-                  'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
               }}
             >
-              Password
+              Admin Password
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -334,21 +332,12 @@ export default function SignUp() {
                   borderRadius: '6px',
                   backgroundColor: 'hsl(0 0% 11%)',
                   color: '#ffffff',
-                  fontFamily:
-                    'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
                   outline: 'none',
-                  transition:
-                    'border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out',
                   boxSizing: 'border-box',
                 }}
-                placeholder=""
-                minLength={6}
-                onFocus={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')
-                }
-                onBlur={(e) =>
-                  (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')
-                }
+                minLength={8}
+                onFocus={(e) => (e.currentTarget.style.borderColor = 'hsl(27 96% 61%)')}
+                onBlur={(e) => (e.currentTarget.style.borderColor = 'hsl(0 0% 18%)')}
               />
               <button
                 type="button"
@@ -384,8 +373,6 @@ export default function SignUp() {
                 borderRadius: '6px',
                 color: 'hsl(0 84% 60%)',
                 fontSize: '14px',
-                fontFamily:
-                  'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
               }}
             >
               {error}
@@ -399,60 +386,26 @@ export default function SignUp() {
             style={{
               width: '100%',
               height: '52px',
-              backgroundColor: isLoading ? '#9ca3af' : 'hsl(27 96% 61%)',
+              backgroundColor: isLoading ? '#475569' : 'hsl(27 96% 61%)',
               color: '#000000',
               border: 'none',
               borderRadius: '6px',
               fontSize: '16px',
-              fontWeight: '500',
-              fontFamily:
-                'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
+              fontWeight: '600',
               cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.15s ease-in-out',
-              marginTop: '20px',
+              transition: 'all 0.15s ease-in-out',
+              marginTop: '12px',
             }}
             onMouseEnter={(e) => {
-              if (!isLoading)
-                e.currentTarget.style.backgroundColor = 'hsl(27 96% 55%)';
+              if (!isLoading) e.currentTarget.style.backgroundColor = 'hsl(27 96% 55%)';
             }}
             onMouseLeave={(e) => {
-              if (!isLoading)
-                e.currentTarget.style.backgroundColor = 'hsl(27 96% 61%)';
+              if (!isLoading) e.currentTarget.style.backgroundColor = 'hsl(27 96% 61%)';
             }}
           >
-            {isLoading ? 'Creating account...' : 'Create account'}
+            {isLoading ? 'Configuring System...' : 'Initialize System Admin'}
           </button>
         </form>
-
-        {/* Sign In Link */}
-        <div style={{ textAlign: 'center', marginTop: '24px' }}>
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#ffffff',
-              fontFamily:
-                'Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif',
-            }}
-          >
-            Already have an account?{' '}
-            <Link
-              href="/auth/signin"
-              style={{
-                color: '#ffffff',
-                textDecoration: 'none',
-                fontWeight: '500',
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.textDecoration = 'underline')
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.textDecoration = 'none')
-              }
-            >
-              Log in
-            </Link>
-          </p>
-        </div>
       </div>
     </div>
   );

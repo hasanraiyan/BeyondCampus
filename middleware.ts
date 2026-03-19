@@ -10,7 +10,10 @@ export async function middleware(request: NextRequest) {
   const publicPaths = [
     '/auth/signin',
     '/auth/signup',
+    '/admin/setup',
     '/api/auth',
+    '/api/system/status',
+    '/api/admin/setup',
     '/api/user/onboarding',
   ];
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));

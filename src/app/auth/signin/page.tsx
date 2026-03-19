@@ -16,18 +16,31 @@ export default function SignIn() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Force dark theme for this page
+  // Force dark theme and check setup status
   useEffect(() => {
     document.documentElement.classList.add('dark');
     document.body.style.backgroundColor = 'hsl(0 0% 3%)';
     document.body.style.color = 'hsl(0 0% 95%)';
+
+    async function checkSetup() {
+      try {
+        const res = await fetch('/api/system/status');
+        const data = await res.json();
+        if (data.needsSetup) {
+          router.push('/admin/setup');
+        }
+      } catch (err) {
+        console.error('Setup check failed:', err);
+      }
+    }
+    checkSetup();
 
     return () => {
       document.documentElement.classList.remove('dark');
       document.body.style.backgroundColor = '';
       document.body.style.color = '';
     };
-  }, []);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

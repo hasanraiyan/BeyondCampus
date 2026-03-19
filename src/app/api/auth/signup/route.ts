@@ -8,6 +8,15 @@ export async function POST(request: NextRequest) {
   try {
     const { firstName, lastName, email, password } = await request.json();
 
+    // 0. Check if any user exists. If not, block regular signup and direct to setup
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      return NextResponse.json(
+        { message: 'System onboarding required. Please visit /admin/setup to create the first admin account.' },
+        { status: 403 }
+      );
+    }
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -25,13 +34,14 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = bcrypt.hashSync(password, 12);
 
-    // Create user
+    // Create user - Enforce STUDENT role for regular signups
     const user = await prisma.user.create({
       data: {
         firstName,
         lastName,
         email,
         password: hashedPassword,
+        role: 'STUDENT', // Hardcoded security guard
       },
     });
 
