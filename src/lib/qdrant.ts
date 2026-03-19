@@ -24,6 +24,30 @@ export const embeddings = new GoogleGenerativeAIEmbeddings({
   model: 'gemini-embedding-001',
 });
 
+const PROGRAMS_COLLECTION = 'programs';
+
+/**
+ * Checks if the shared 'programs' collection exists.
+ * If it doesn't, creates it (size: 3072, distance: 'Cosine').
+ */
+export async function ensureProgramsCollection() {
+  try {
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
+    if (!exists.exists) {
+      await qdrantClient.createCollection(PROGRAMS_COLLECTION, {
+        vectors: {
+          size: 3072,
+          distance: 'Cosine',
+        },
+      });
+      console.log(`Created Qdrant collection: ${PROGRAMS_COLLECTION}`);
+    }
+  } catch (error) {
+    console.error(`Error ensuring collection ${PROGRAMS_COLLECTION} exists:`, error);
+    throw error;
+  }
+}
+
 /**
  * Checks if a Qdrant collection exists for the given universityId.
  * If it doesn't, creates it (size: 3072, distance: 'Cosine').
@@ -102,13 +126,11 @@ export async function deleteProgramVector(
   universityId: string,
   programId: string
 ) {
-  const collectionName = `university_${universityId}`;
-
   try {
-    const exists = await qdrantClient.collectionExists(collectionName);
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
     if (!exists.exists) return; // nothing to delete
 
-    await qdrantClient.delete(collectionName, {
+    await qdrantClient.delete(PROGRAMS_COLLECTION, {
       wait: true,
       filter: {
         must: [
@@ -118,7 +140,7 @@ export async function deleteProgramVector(
       },
     });
 
-    console.log(`[Qdrant] Deleted vectors for program ${programId} from ${collectionName}`);
+    console.log(`[Qdrant] Deleted vectors for program ${programId} from ${PROGRAMS_COLLECTION}`);
   } catch (err) {
     console.error(`[Qdrant] Failed to delete vectors for program ${programId} (non-fatal):`, err);
   }
@@ -136,8 +158,7 @@ export async function embedPrograms(
 ) {
   if (!programs || programs.length === 0) return;
 
-  const collectionName = `university_${universityId}`;
-  await ensureCollection(universityId);
+  await ensureProgramsCollection();
 
   const points = [];
 
@@ -175,41 +196,42 @@ export async function embedPrograms(
   }
 
   if (points.length > 0) {
-    await qdrantClient.upsert(collectionName, { wait: true, points });
-    console.log(`Upserted ${points.length} program vectors to ${collectionName}`);
+    await qdrantClient.upsert(PROGRAMS_COLLECTION, { wait: true, points });
+    console.log(`Upserted ${points.length} program vectors to ${PROGRAMS_COLLECTION}`);
   }
 }
 
 /**
  * Searches Qdrant for programs semantically matching the query.
- * Scoped to program vectors only (type: 'program' filter).
+ * Scoped to program vectors only (type: 'program' filter) for a specific university.
  */
 export async function searchPrograms(
   universityId: string,
   query: string,
   topK: number = 8
 ) {
-  const collectionName = `university_${universityId}`;
-
   try {
-    const exists = await qdrantClient.collectionExists(collectionName);
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
     if (!exists.exists) return [];
 
     const queryVector = await embeddings.embedQuery(query);
 
-    const searchResults = await qdrantClient.search(collectionName, {
+    const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
       vector: queryVector,
       limit: topK,
       with_payload: true,
       filter: {
-        must: [{ key: 'type', match: { value: 'program' } }],
+        must: [
+          { key: 'type', match: { value: 'program' } },
+          { key: 'universityId', match: { value: universityId } }
+        ],
       },
     });
 
     return searchResults;
   } catch (error: any) {
     if (error?.status === 404) return [];
-    console.error(`Error searching programs in ${collectionName}:`, error);
+    console.error(`Error searching programs in ${PROGRAMS_COLLECTION}:`, error);
     throw error;
   }
 }
@@ -249,49 +271,30 @@ export async function searchKnowledge(
 }
 
 /**
- * Searches Qdrant for programs semantically matching the query across ALL collections (universities).
+ * Searches Qdrant for programs semantically matching the query globally.
  */
 export async function searchAllPrograms(
   query: string,
   topK: number = 20
 ) {
   try {
-    // 1. Get all collections
-    const collectionsResponse = await qdrantClient.getCollections();
-    const collections = collectionsResponse.collections.map(c => c.name);
+    const exists = await qdrantClient.collectionExists(PROGRAMS_COLLECTION);
+    if (!exists.exists) return [];
 
-    if (collections.length === 0) return [];
-
-    // 2. Embed the query
     const queryVector = await embeddings.embedQuery(query);
 
-    // 3. Search each collection in parallel
-    const searchPromises = collections.map(async (collectionName) => {
-      try {
-        const results = await qdrantClient.search(collectionName, {
-          vector: queryVector,
-          limit: topK,
-          with_payload: true,
-          filter: {
-            must: [{ key: 'type', match: { value: 'program' } }],
-          },
-        });
-        return results;
-      } catch (err: any) {
-        if (err?.status === 404) return [];
-        console.error(`Error searching programs in ${collectionName}:`, err);
-        return [];
-      }
+    const searchResults = await qdrantClient.search(PROGRAMS_COLLECTION, {
+      vector: queryVector,
+      limit: topK,
+      with_payload: true,
+      filter: {
+        must: [{ key: 'type', match: { value: 'program' } }],
+      },
     });
 
-    const allResultsArrays = await Promise.all(searchPromises);
-
-    // 4. Flatten, sort by score descending, and take topK
-    const flatResults = allResultsArrays.flat();
-    flatResults.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
-    return flatResults.slice(0, topK);
+    return searchResults;
   } catch (error: any) {
+    if (error?.status === 404) return [];
     console.error('Error searching all programs in Qdrant:', error);
     throw error;
   }
